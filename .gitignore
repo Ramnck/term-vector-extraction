@@ -1,0 +1,6 @@
+data/*
+__pycache__/
+test.py
+__.ipynb
+main copy*
+.env
