@@ -5,7 +5,13 @@ load_dotenv()
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
 from documents import FipsAPI, FileSystem
-from extractors import RAKExtractor, YAKExtractor, TextRankExtractor, KeyBERTExtractor
+from extractors import (
+    RAKExtractor,
+    YAKExtractor,
+    TextRankExtractor,
+    KeyBERTExtractor,
+    MultipartiteExtractor,
+)
 
 
 import logging
@@ -41,6 +47,7 @@ async def main(num_of_docs=None, name_of_experiment="KWE"):
         YAKExtractor(),
         TextRankExtractor(),
         KeyBERTExtractor(),
+        MultipartiteExtractor(),
     ]
 
     logger.info("Начало обработки")
@@ -82,7 +89,9 @@ async def main(num_of_docs=None, name_of_experiment="KWE"):
         data["relevant"] = relevant
 
         with open(
-            BASE_DATA_PATH / "kwe" / (doc.id + ".json"), "w+", encoding="utf-8"
+            BASE_DATA_PATH / "eval" / "kwe" / (doc.id + ".json"),
+            "w+",
+            encoding="utf-8",
         ) as file:
             json.dump(data, file, indent=4, ensure_ascii=False)
 

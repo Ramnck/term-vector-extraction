@@ -61,7 +61,7 @@ class FipsAPI(LoaderBase):
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 self.api_url + "search",
-                data='{{"q": "{0}"}}'.format(params).encode("utf-8"),
+                data='{{"q": "{0}", "limit": 20}}'.format(params).encode("utf-8"),
                 headers=self._headers,
             ) as res:
                 return await res.json()

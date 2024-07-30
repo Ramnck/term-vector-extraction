@@ -90,7 +90,11 @@ class KeyBERTExtractor(KeyWordExtractorBase):
 
     def get_keywords(self, doc: DocumentBase, num=50) -> list:
         out = self.model.extract_keywords(
-            clean_text(doc.text), keyphrase_ngram_range=(1, 1), top_n=num, use_mmr=True
+            clean_text(doc.text),
+            keyphrase_ngram_range=(1, 1),
+            top_n=num,
+            use_mmr=True,
+            stop_words=stopwords,
         )
         return [i[0] for i in out]
 
