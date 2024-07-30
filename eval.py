@@ -5,7 +5,14 @@ import json
 
 
 async def main(name_of_file: str | Path):
-    eval_dict = {"all_docs": 0, "self_top1": 0, "soft": 0, "hard": 0, "avg": 0}
+    eval_dict = {
+        "all_docs": 0,
+        "self_top1": 0,
+        "soft": 0,
+        "hard": 0,
+        "avg": 0,
+        "no_relevant": 0,
+    }
     metrics = {
         "RAKE": eval_dict.copy(),
         "YAKE": eval_dict.copy(),
@@ -38,11 +45,13 @@ async def main(name_of_file: str | Path):
 
             if relevant:
                 metrics[extractor_name]["self_top1"] += relevant[0] == file_path.stem
+            else:
+                metrics[extractor_name]["no_relevant"] += 1
 
     for extractor_name, eval in metrics.items():
         print(extractor_name, "metrics:")
         for metric in eval.keys():
-            if metric == "self_top1":
+            if metric in ["self_top1", "no_relevant"]:
                 eval[metric] = round(eval[metric] / len(list_of_files))
             elif metric != "all_docs":
                 eval[metric] = round(eval[metric] / eval["all_docs"], 2)
