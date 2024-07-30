@@ -1,5 +1,6 @@
 from pymorphy3 import MorphAnalyzer
-from nltk.corpus import stopwords
+import nltk.corpus
+from sklearn.feature_extraction.text import CountVectorizer
 
 from api import KeyWordExtractorBase, DocumentBase
 
@@ -13,8 +14,9 @@ import pke
 
 with open("SimilarStopWords.txt") as file:
     stopwords_iteco = [i for i in file]
-stopwords_nltk = list(stopwords.words("russian"))
+stopwords_nltk = list(nltk.corpus.stopwords.words("russian"))
 stopwords = list(set(stopwords_nltk) | set(stopwords_iteco))
+
 
 morph = MorphAnalyzer()
 
@@ -89,12 +91,17 @@ class KeyBERTExtractor(KeyWordExtractorBase):
         self.model = KeyBERT(model="paraphrase-multilingual-MiniLM-L12-v2")
 
     def get_keywords(self, doc: DocumentBase, num=50) -> list:
+        vectorizer = CountVectorizer(
+            ngram_range=(1, 1),
+            stop_words=[i.encode("utf-8") for i in stopwords],
+            encoding="utf-8",
+        )
+
         out = self.model.extract_keywords(
             clean_text(doc.text),
-            keyphrase_ngram_range=(1, 1),
+            vectorizer=vectorizer,
             top_n=num,
             use_mmr=True,
-            stop_words=stopwords,
         )
         return [i[0] for i in out]
 
@@ -103,7 +110,7 @@ class KeyBERTExtractor(KeyWordExtractorBase):
         return "KBRT"
 
 
-class MultipartiteExtractor(KeyWordExtractorBase):
+class MultipartiteRankExtractor(KeyWordExtractorBase):
     def __init__(self) -> None:
         self.extractor = pke.unsupervised.MultipartiteRank()
 

@@ -10,7 +10,7 @@ from extractors import (
     YAKExtractor,
     TextRankExtractor,
     KeyBERTExtractor,
-    MultipartiteExtractor,
+    MultipartiteRankExtractor,
 )
 
 
@@ -47,7 +47,7 @@ async def main(num_of_docs=None, name_of_experiment="KWE"):
         YAKExtractor(),
         TextRankExtractor(),
         KeyBERTExtractor(),
-        MultipartiteExtractor(),
+        MultipartiteRankExtractor(),
     ]
 
     logger.info("Начало обработки")

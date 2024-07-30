@@ -16,11 +16,15 @@ async def main():
 
     base_path = Path("data") / "eval"
 
+    docs_with_single_56 = []
+
     for file_path in (base_path / "kwe").iterdir():
         with open(file_path, encoding="utf-8") as file:
             data = json.load(file)
 
         citations = data["56"]
+        if len(citations) == 1:
+            docs_with_single_56.append(file_path.stem)
         for extractor_name, relevant in data["relevant"].items():
             if len(citations) > 0:
                 num_of_hits = 0
@@ -42,6 +46,8 @@ async def main():
                 eval[metric] = round(eval[metric] / eval["all_docs"], 2)
             print(metric, "-", round(eval[metric], 2))
         print()
+
+    print(docs_with_single_56)
 
     with open(base_path / "eval.json", "w+") as file:
         json.dump(metrics, file, ensure_ascii=False, indent=4)
