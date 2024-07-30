@@ -1,4 +1,3 @@
-import re
 from abc import ABC
 
 
@@ -16,6 +15,9 @@ class DocumentBase(ABC):
 
     @property
     def id(self) -> str:
+        raise NotImplementedError
+
+    def __hash__(self) -> int:
         raise NotImplementedError
 
 
@@ -51,16 +53,3 @@ class LoaderBase(ABC):
 
     async def __anext__(self) -> DocumentBase:
         raise NotImplementedError
-
-    # Iterate over IDs of documents
-    # def __iter__(self):
-    # raise NotImplementedError
-
-    # def __next__(self):
-    # raise NotImplementedError
-
-
-def clean_text(text):
-    patterns = "[A-Za-z0-9!#$%&'()*+,./:;<=>?@[\]^_`{|}~—\"\-]+"
-
-    return re.sub(patterns, " ", text)

@@ -1,5 +1,4 @@
-from api import DocumentBase, LoaderBase, clean_text
-import requests as r
+from api import DocumentBase, LoaderBase
 import random
 import aiohttp
 import aiofiles

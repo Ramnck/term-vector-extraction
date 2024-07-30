@@ -74,14 +74,12 @@ async def main(num_of_docs=None, name_of_experiment="KWE"):
                 relevant[extractor_name] = tg.create_task(
                     api.find_relevant_by_keywords(kw)
                 )
+        relevant = {k: v.result() for k, v in relevant.items()}
 
         data = {"56": doc.citations}
 
-        for i, j in relevant.items():
-            data[i + "_relevant"] = j.result()
-
-        for i, j in kws.items():
-            data[i + "_keywords"] = j
+        data["keywords"] = kws
+        data["relevant"] = relevant
 
         with open(
             BASE_DATA_PATH / "kwe" / (doc.id + ".json"), "w+", encoding="utf-8"
