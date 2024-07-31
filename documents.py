@@ -157,7 +157,7 @@ class XMLDoc(DocumentBase):
         c = self.xml_obj.find(XMLDoc.Namespace.com + "IPOfficeCode")
         n = self.xml_obj.find(XMLDoc.Namespace.pat + "PublicationNumber")
         k = self.xml_obj.find(XMLDoc.Namespace.com + "PatentDocumentKindCode")
-        return c.text + n.text.strip("0") + k.text
+        return c.text + n.text.lstrip("0") + k.text
 
 
 class FileSystem(LoaderBase):
