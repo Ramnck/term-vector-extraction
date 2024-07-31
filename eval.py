@@ -29,7 +29,13 @@ async def main(name_of_file: str | Path):
         with open(file_path, encoding="utf-8") as file:
             data = json.load(file)
 
+        doc_without_56 = []
+
         citations = data["56"]
+
+        if len(citations) == 0:
+            doc_without_56.append(file_path.stem)
+
         for extractor_name, relevant in data["relevant"].items():
             if len(citations) > 0:
                 num_of_hits = 0
@@ -47,7 +53,6 @@ async def main(name_of_file: str | Path):
                 metrics[extractor_name]["self_top1"] += relevant[0] == file_path.stem
             else:
                 metrics[extractor_name]["no_relevant"] += 1
-
     for extractor_name, eval in metrics.items():
         print(extractor_name, "metrics:")
         for metric in eval.keys():
@@ -58,6 +63,8 @@ async def main(name_of_file: str | Path):
 
             print(metric, "-", round(eval[metric], 2))
         print()
+
+    # print(doc_without_56)
 
     with open(base_path / name_of_file, "w+") as file:
         json.dump(metrics, file, ensure_ascii=False, indent=4)

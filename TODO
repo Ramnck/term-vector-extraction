@@ -1,0 +1,5 @@
+; - add p parse in citation (clear errors NO_CITATIONS)
+; - add offset bc doc.id may be first
+- Учитывать семейства
+- Проверить правильно ли считаются метрики
+- Посмотреть можно ли в 7 версию эластика пихать веса в запрос

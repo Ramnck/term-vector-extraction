@@ -14,27 +14,23 @@ rand_terms = "ракета машина смазка установка само
 
 class FipsDoc(DocumentBase):
     def __init__(self, raw) -> None:
-        self.raw = raw
-        self.text = None
+        self.raw_json = raw
 
     @property
     def citations(self) -> list:
-        return [i["identity"] for i in self.raw["common"]["citated_docs"]]
+        return [i["identity"] for i in self.raw_json["common"]["citated_docs"]]
 
     def get_xml(self):
-        tree = ET.fromstring(self.raw["description"]["ru"])
+        tree = ET.fromstring(self.raw_json["description"]["ru"])
         return tree
 
     @property
     def text(self) -> str:
-        if self.text is None:
-            self.text = "\n".join(i.text for i in self.get_xml())
-            # self.text = clean_text(self.text)
-        return self.text
+        return "\n".join(i.text for i in self.get_xml() if i.text is not None)
 
     @property
     def id(self) -> str:
-        return self.raw["id"]
+        return self.raw_json["id"]
 
 
 class FipsAPI(LoaderBase):
@@ -57,25 +53,32 @@ class FipsAPI(LoaderBase):
             "Content-Type": "application/json",
         }
 
-    async def _search_query(self, params: str) -> dict:
+    # async def _search_query(self, query: str, limit: int = 20, offset: int = 0) -> dict:
+    async def _search_query(self, **kwargs) -> dict:
         async with aiohttp.ClientSession() as session:
+            data = ""
+            for key, value in kwargs.items():
+                data += '"{0}": {1}, '.format(
+                    key, '"' + value + '"' if type(value) == str else value
+                )
+            data = "{" + data[:-2] + "}"
+
             async with session.post(
                 self.api_url + "search",
-                data='{{"q": "{0}", "limit": 20}}'.format(params).encode("utf-8"),
+                data=data.encode("utf-8"),
                 headers=self._headers,
             ) as res:
                 return await res.json()
 
     async def get_random_doc(self) -> FipsDoc:
-        res = await self._search_query(random.choice(rand_terms))
+        res = await self._search_query(q=random.choice(rand_terms), limit=20)
         doc = random.choice(res["hits"])
         return await self.get_doc(doc["id"])
 
     async def find_relevant_by_keywords(self, kws: list, num_of_docs=20) -> list:
-        res = await self._search_query(" OR ".join(kws))
-        docs = [
-            i["id"][: i["id"].index("_")] for i in res.get("hits", [])[:num_of_docs]
-        ]
+        res = await self._search_query(q=" OR ".join(kws), offset=1, limit=num_of_docs)
+        docs = [i["id"][: i["id"].index("_")] for i in res.get("hits", [])]
+
         return docs
 
 
@@ -93,10 +96,13 @@ class XMLDoc(DocumentBase):
     def citations(self) -> list:
         tag = self.xml_obj.find(XMLDoc.Namespace.pat + "BibliographicData")
         tag = tag.find(XMLDoc.Namespace.pat + "ReferenceCitationBag")
-        refs = [
-            i.text
-            for i in tag.findall(XMLDoc.Namespace.pat + "ReferenceCitationFreeFormat")
-        ]
+        refs = []
+        for i in tag.findall(XMLDoc.Namespace.pat + "ReferenceCitationFreeFormat"):
+            if i.text:
+                refs.append(i.text)
+            for j in i:
+                if j.text:
+                    refs.append(j.text)
         citations = " ".join(refs)
 
         pattern = r"\b[A-Z]{2} ?\d+ ?[A-ZА-Я]\d?\b"
