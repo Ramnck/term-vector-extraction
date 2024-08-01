@@ -1,5 +1,4 @@
-from pymorphy3 import MorphAnalyzer
-import nltk.corpus
+from lexis import clean_text_ru, lemmatize_ru, stopwords_ru
 from sklearn.feature_extraction.text import CountVectorizer
 
 from api import KeyWordExtractorBase, DocumentBase
@@ -8,41 +7,13 @@ from rake_nltk import Rake
 import yake
 from summa import keywords
 from keybert import KeyBERT
-import re
 import pke
-
-
-with open("SimilarStopWords.txt") as file:
-    stopwords_iteco = [i for i in file]
-stopwords_nltk = list(nltk.corpus.stopwords.words("russian"))
-stopwords = list(set(stopwords_nltk) | set(stopwords_iteco))
-
-
-morph = MorphAnalyzer()
-
-
-def clean_text(text):
-    patterns = "[A-Za-z0-9!#$%&'()*+,./:;<=>?@[\]^_`{|}~—\"\-]+"
-    return re.sub(patterns, " ", text)
-
-
-def lemmatize(doc):
-    tokens = []
-    for token in doc.split():
-        if token:
-            token = token.strip()
-            token = morph.normal_forms(token)[0]
-            if token not in stopwords:
-                tokens.append(token)
-    if len(tokens) > 2:
-        return tokens
-    return None
 
 
 class RAKExtractor(KeyWordExtractorBase):
     def __init__(self) -> None:
         self.rake = Rake(
-            stopwords=stopwords,
+            stopwords=stopwords_ru,
             max_length=1,
             include_repeated_phrases=False,
         )
@@ -60,11 +31,11 @@ class RAKExtractor(KeyWordExtractorBase):
 class YAKExtractor(KeyWordExtractorBase):
     def __init__(self, dedupLim=0.9) -> None:
         self.y = yake.KeywordExtractor(
-            lan="ru", n=1, dedupLim=dedupLim, top=50, stopwords=stopwords
+            lan="ru", n=1, dedupLim=dedupLim, top=50, stopwords=stopwords_ru
         )
 
     def get_keywords(self, doc: DocumentBase, num=50) -> list:
-        out = self.y.extract_keywords(clean_text(doc.text))
+        out = self.y.extract_keywords(clean_text_ru(doc.text))
         return [i[0] for i in out[:num]]
 
     @classmethod
@@ -77,7 +48,7 @@ class TextRankExtractor(KeyWordExtractorBase):
         pass
 
     def get_keywords(self, doc: DocumentBase, num=50) -> list:
-        text_clean = " ".join(lemmatize(doc.text))
+        text_clean = " ".join(lemmatize_ru(doc.text))
         out = keywords.keywords(text_clean, language="russian").split("\n")
         return out[:num]
 
@@ -93,12 +64,12 @@ class KeyBERTExtractor(KeyWordExtractorBase):
     def get_keywords(self, doc: DocumentBase, num=50) -> list:
         vectorizer = CountVectorizer(
             ngram_range=(1, 1),
-            stop_words=[i.encode("utf-8") for i in stopwords],
+            stop_words=[i.encode("utf-8") for i in stopwords_ru],
             encoding="utf-8",
         )
 
         out = self.model.extract_keywords(
-            clean_text(doc.text),
+            clean_text_ru(doc.text),
             vectorizer=vectorizer,
             top_n=num,
             use_mmr=True,
@@ -116,7 +87,7 @@ class MultipartiteRankExtractor(KeyWordExtractorBase):
 
     def get_keywords(self, doc: DocumentBase, num=50) -> list:
         self.extractor.load_document(
-            clean_text(doc.text), language="ru", stoplist=stopwords
+            clean_text_ru(doc.text), language="ru", stoplist=stopwords_ru
         )
         self.extractor.candidate_selection()
         self.extractor.candidate_weighting(alpha=1.1, threshold=0.74, method="average")
