@@ -53,6 +53,7 @@ async def main(name_of_file: str | Path):
                 metrics[extractor_name]["self_top1"] += relevant[0] == file_path.stem
             else:
                 metrics[extractor_name]["no_relevant"] += 1
+
     for extractor_name, eval in metrics.items():
         print(extractor_name, "metrics:")
         for metric in eval.keys():
@@ -64,7 +65,8 @@ async def main(name_of_file: str | Path):
             print(metric, "-", round(eval[metric], 2))
         print()
 
-    # print(doc_without_56)
+    if doc_without_56:
+        print("Документы без 56 поля:", doc_without_56)
 
     with open(base_path / name_of_file, "w+") as file:
         json.dump(metrics, file, ensure_ascii=False, indent=4)
