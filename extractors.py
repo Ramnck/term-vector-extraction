@@ -1,4 +1,4 @@
-from lexis import clean_text_ru, lemmatize_ru, stopwords_ru
+from lexis import clean_text_ru, lemmatize_doc, stopwords_ru
 from sklearn.feature_extraction.text import CountVectorizer
 
 from api import KeyWordExtractorBase, DocumentBase
@@ -48,7 +48,7 @@ class TextRankExtractor(KeyWordExtractorBase):
         pass
 
     def get_keywords(self, doc: DocumentBase, num=50) -> list:
-        text_clean = " ".join(lemmatize_ru(doc.text))
+        text_clean = " ".join(lemmatize_doc(doc.text, stopwords_ru))
         out = keywords.keywords(text_clean, language="russian").split("\n")
         return out[:num]
 

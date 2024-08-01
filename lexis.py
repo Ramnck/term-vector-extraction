@@ -15,13 +15,17 @@ def clean_text_ru(text):
     return re.sub(patterns, " ", text)
 
 
-def lemmatize_ru(doc):
+def lemmatize_ru_word(word: str):
+    return morph.normal_forms(word)[0]
+
+
+def lemmatize_doc(doc: str, stopwords: list[str] = []):
     tokens = []
     for token in doc.split():
+        token = token.strip()
         if token:
-            token = token.strip()
-            token = morph.normal_forms(token)[0]
-            if token not in stopwords_ru:
+            token = lemmatize_ru_word(token)
+            if token not in stopwords:
                 tokens.append(token)
     if len(tokens) > 2:
         return tokens
