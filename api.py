@@ -28,7 +28,6 @@ class KeyWordExtractorBase(ABC):
     def get_keywords(self, doc: DocumentBase) -> list:
         raise NotImplementedError
 
-    @classmethod
     def get_name(self) -> str:
         return "NOT_IMPL"
 

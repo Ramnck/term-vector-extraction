@@ -13,13 +13,10 @@ async def main(name_of_file: str | Path):
         "avg": 0,
         "no_relevant": 0,
     }
-    metrics = {
-        "RAKE": eval_dict.copy(),
-        "YAKE": eval_dict.copy(),
-        "TXTR": eval_dict.copy(),
-        "KBRT": eval_dict.copy(),
-        "MPTE": eval_dict.copy(),
-    }
+
+    methods = ["RAKE", "YAKE", "KBRT", "RULF"]
+
+    metrics = {method: eval_dict.copy() for method in methods}
 
     base_path = Path("data") / "eval"
 
@@ -37,6 +34,9 @@ async def main(name_of_file: str | Path):
             doc_without_56.append(file_path.stem)
 
         for extractor_name, relevant in data["relevant"].items():
+            if extractor_name not in metrics.keys():
+                continue
+
             if len(citations) > 0:
                 num_of_hits = 0
                 for cite in citations:

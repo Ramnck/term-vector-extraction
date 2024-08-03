@@ -5,14 +5,8 @@ load_dotenv()
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
 from documents import FipsAPI, FileSystem
-from extractors import (
-    RAKExtractor,
-    YAKExtractor,
-    TextRankExtractor,
-    KeyBERTExtractor,
-    MultipartiteRankExtractor,
-)
-
+from extractors import RAKExtractor, YAKExtractor, KeyBERTExtractor, RuLongrormerModel
+from lexis import clean_ru_text
 
 import logging
 import asyncio
@@ -42,13 +36,12 @@ def find_last_file(base_name_of_file: Path):
 async def main(num_of_docs=None, name_of_experiment="KWE"):
     api = FipsAPI(FIPS_API_KEY)
     loader = FileSystem("data\\raw\\skolkovo")
-    extractors = [
-        RAKExtractor(),
-        YAKExtractor(),
-        TextRankExtractor(),
-        KeyBERTExtractor(),
-        MultipartiteRankExtractor(),
-    ]
+    longformer = KeyBERTExtractor(
+        RuLongrormerModel(),
+        method_name="RULF",
+        text_extraction_func=lambda x: f"[CLS] {clean_ru_text(x.claims)}  {clean_ru_text(x.abstract)} [CLS] {clean_ru_text(x.description)}",
+    )
+    extractors = [RAKExtractor(), YAKExtractor(), KeyBERTExtractor(), longformer]
 
     logger.info("Начало обработки")
 

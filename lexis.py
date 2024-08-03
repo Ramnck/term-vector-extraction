@@ -10,16 +10,16 @@ stopwords_ru = list(set(stopwords_nltk_ru) | set(stopwords_iteco))
 morph = MorphAnalyzer()
 
 
-def clean_text_ru(text):
+def clean_ru_text(text) -> str:
     patterns = "[A-Za-z0-9!#$%&'()*+,./:;<=>?@[\]^_`{|}~—\"\-]+"
     return re.sub(patterns, " ", text)
 
 
-def lemmatize_ru_word(word: str):
+def lemmatize_ru_word(word: str) -> str:
     return morph.normal_forms(word)[0]
 
 
-def lemmatize_doc(doc: str, stopwords: list[str] = []):
+def lemmatize_doc(doc: str, stopwords: list[str] = []) -> str:
     tokens = []
     for token in doc.split():
         token = token.strip()
@@ -28,5 +28,5 @@ def lemmatize_doc(doc: str, stopwords: list[str] = []):
             if token not in stopwords:
                 tokens.append(token)
     if len(tokens) > 2:
-        return tokens
+        return " ".join(tokens)
     return None
