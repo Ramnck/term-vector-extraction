@@ -1,4 +1,5 @@
 from abc import ABC
+import numpy as np
 
 
 class DocumentBase(ABC):
@@ -25,7 +26,7 @@ class KeyWordExtractorBase(ABC):
     def __init__(self) -> None:
         raise NotImplementedError
 
-    def get_keywords(self, doc: DocumentBase) -> list:
+    def get_keywords(self, doc: DocumentBase, **kwargs) -> list:
         raise NotImplementedError
 
     def get_name(self) -> str:
@@ -51,4 +52,12 @@ class LoaderBase(ABC):
         raise NotImplementedError
 
     async def __anext__(self) -> DocumentBase:
+        raise NotImplementedError
+
+
+class EmbedderBase(ABC):
+    def __init__(self, model):
+        raise NotImplementedError
+
+    def embed(self, documents: list[str], **kwargs) -> np.ndarray:
         raise NotImplementedError

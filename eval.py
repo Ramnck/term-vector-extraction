@@ -5,6 +5,8 @@ import json
 
 
 async def main(name_of_file: str | Path):
+    base_path = Path("data") / "eval"
+
     eval_dict = {
         "all_docs": 0,
         "self_top1": 0,
@@ -14,11 +16,12 @@ async def main(name_of_file: str | Path):
         "no_relevant": 0,
     }
 
-    methods = ["RAKE", "YAKE", "KBRT", "RULF"]
+    # methods = ["RAKE", "YAKE", "KBRT", "RULF"]
+
+    with open(base_path / "names_of_methods.json", encoding="utf-8") as file:
+        methods = json.load(file)
 
     metrics = {method: eval_dict.copy() for method in methods}
-
-    base_path = Path("data") / "eval"
 
     list_of_files = list((base_path / "kwe").iterdir())
 

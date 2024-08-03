@@ -1,29 +1,30 @@
-from api import KeyWordExtractorBase, DocumentBase
+from api import KeyWordExtractorBase, DocumentBase, EmbedderBase
+from lexis import clean_ru_text, lemmatize_doc, stopwords_ru
+
 from keybert import KeyBERT
-from keybert.backend._base import BaseEmbedder
+
 import torch
 import numpy as np
-from transformers import LongformerModel, LongformerTokenizerFast
 
-from lexis import clean_ru_text, lemmatize_doc, stopwords_ru
 from sklearn.feature_extraction.text import CountVectorizer
+from transformers import LongformerModel, LongformerTokenizerFast
+from sklearn.metrics.pairwise import cosine_similarity
+from keybert._mmr import mmr
+from keybert._maxsum import max_sum_distance
+from typing import Any
 
 
-class RuLongrormerModel(BaseEmbedder):
+class RuLongrormerEmbedder(EmbedderBase):
     def __init__(
         self,
-        embedding_model: str = "kazzand/ru-longformer-tiny-16384",
-        word_embedding_model=None,
+        model: str = "kazzand/ru-longformer-tiny-16384",
     ):
-        self.model = LongformerModel.from_pretrained(embedding_model)
-        self.tokenizer = LongformerTokenizerFast.from_pretrained(embedding_model)
+        self.model = LongformerModel.from_pretrained(model)
+        self.tokenizer = LongformerTokenizerFast.from_pretrained(model)
 
-    def embed(self, documents: list[str] | str, verbose: bool = False) -> np.ndarray:
+    def embed(self, documents: list[str], **kwargs) -> np.ndarray:
         device = "cuda"
         self.model.to(device)
-
-        if isinstance(documents, str):
-            documents = [documents]
 
         batches = [
             self.tokenizer(document, return_tensors="pt") for document in documents
@@ -53,22 +54,84 @@ class RuLongrormerModel(BaseEmbedder):
         return np.array(outputs)
 
 
+class KeyBERTModel:
+    def __init__(
+        self, doc_embedder: EmbedderBase, word_embedder: EmbedderBase | None = None
+    ) -> None:
+        self.word_embedder = (
+            word_embedder if word_embedder is not None else doc_embedder
+        )
+        self.doc_embedder = doc_embedder
+
+    def extract_doc_embedding(self, doc: str) -> list[list[float]]:
+        return self.doc_embedder.embed([doc])
+
+    def extract_word_embeddings(self, words: list[str]) -> list[list[float]]:
+        return self.word_embedder.embed(words)
+
+    def extract_keywords(
+        self,
+        document: str,
+        top_n: int = 50,
+        use_mmr: bool = False,
+        diversity: float = 0.5,
+        nr_candidates: int = 20,
+        **kwargs
+    ) -> list[tuple[str, float]]:
+        """
+        Arguments:
+            document: str
+            top_n: Return the top n keywords/keyphrases
+            use_maxsum: Whether to use Max Sum Distance for the selection
+                        of keywords/keyphrases.
+            use_mmr: Whether to use Maximal Marginal Relevance (MMR) for the
+                     selection of keywords/keyphrases.
+            diversity: The diversity of the results between 0 and 1 if `use_mmr`
+                       is set to True.
+            nr_candidates: Whether to use Maximal Marginal Relevance (MMR) for the
+                     selection of keywords/keyphrases.
+        """
+
+        lemmatized_text = lemmatize_doc(document, stopwords_ru)
+
+        words = [word for word in set(lemmatized_text.split()) if word]
+
+        word_embeddings = self.extract_word_embeddings(words)
+        doc_embedding = self.extract_doc_embedding(document)
+
+        # Maximal Marginal Relevance (MMR)
+        if use_mmr:
+            keywords = mmr(
+                doc_embedding,
+                word_embeddings,
+                words,
+                top_n,
+                diversity,
+            )
+        # Cosine-based keyword extraction
+        else:
+            distances = cosine_similarity(doc_embedding, word_embeddings)
+            keywords = [
+                (words[index], round(float(distances[0][index]), 4))
+                for index in distances.argsort()[0][-top_n:]
+            ][::-1]
+
+        return keywords
+
+
 class KeyBERTExtractor(KeyWordExtractorBase):
     def __init__(
         self,
-        model: str | BaseEmbedder = "paraphrase-multilingual-MiniLM-L12-v2",
+        model: str | KeyBERTModel | Any = "paraphrase-multilingual-MiniLM-L12-v2",
         method_name: str = "KBRT",
     ) -> None:
         self.method_name = method_name
-        self.model = KeyBERT(model=model)
+        if isinstance(model, KeyBERTModel):
+            self.model = model
+        else:
+            self.model = KeyBERT(model)
 
     def get_keywords(self, doc: DocumentBase, num=50, **kwargs) -> list:
-        vectorizer = CountVectorizer(
-            ngram_range=(1, 1),
-            stop_words=[i.encode("utf-8") for i in stopwords_ru],
-            encoding="utf-8",
-        )
-
         text_extraction_func = kwargs.get(
             "text_extraction_func", lambda doc: clean_ru_text(doc.text)
         )
@@ -77,11 +140,11 @@ class KeyBERTExtractor(KeyWordExtractorBase):
 
         out = self.model.extract_keywords(
             text,
-            vectorizer=vectorizer,
             top_n=num,
             use_mmr=kwargs.get("use_mmr", False),
             use_maxsum=kwargs.get("use_maxsum", False),
         )
+
         return [i[0] for i in out]
 
     def get_name(self) -> str:

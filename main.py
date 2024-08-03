@@ -5,7 +5,13 @@ load_dotenv()
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
 from documents import FipsAPI, FileSystem
-from extractors import RAKExtractor, YAKExtractor, KeyBERTExtractor, RuLongrormerModel
+from extractors import (
+    RAKExtractor,
+    YAKExtractor,
+    KeyBERTExtractor,
+    KeyBERTModel,
+    RuLongrormerEmbedder,
+)
 from lexis import clean_ru_text
 
 import logging
@@ -14,6 +20,7 @@ import time
 from pathlib import Path
 import json
 
+from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -36,12 +43,31 @@ def find_last_file(base_name_of_file: Path):
 async def main(num_of_docs=None, name_of_experiment="KWE"):
     api = FipsAPI(FIPS_API_KEY)
     loader = FileSystem("data\\raw\\skolkovo")
-    longformer = KeyBERTExtractor(
-        RuLongrormerModel(),
-        method_name="RULF",
-        text_extraction_func=lambda x: f"[CLS] {clean_ru_text(x.claims)}  {clean_ru_text(x.abstract)} [CLS] {clean_ru_text(x.description)}",
-    )
-    extractors = [RAKExtractor(), YAKExtractor(), KeyBERTExtractor(), longformer]
+
+    extractors = [
+        RAKExtractor(),
+        YAKExtractor(),
+        KeyBERTExtractor(method_name="paraphrase-multilingual-MiniLM-L12-v2"),
+        KeyBERTExtractor(
+            KeyBERTModel(RuLongrormerEmbedder()),
+            method_name="ru-longformer-tiny-16384",
+        ),
+        KeyBERTExtractor(
+            SentenceTransformer("DiTy/bi-encoder-russian-msmarco"),
+            "bi-encoder-russian-msmarco",
+        ),
+        KeyBERTExtractor(
+            SentenceTransformer("cointegrated/rubert-tiny2"), "rubert-tiny2"
+        ),
+    ]
+
+    with open(
+        BASE_DATA_PATH / "eval" / "names_of_methods.json", "w+", encoding="utf-8"
+    ) as file:
+        names = [i.get_name() for i in extractors]
+        json.dump(names, file, indent=4, ensure_ascii=False)
+
+    exit()
 
     logger.info("Начало обработки")
 
@@ -60,7 +86,17 @@ async def main(num_of_docs=None, name_of_experiment="KWE"):
             name = ex.get_name()
             try:
                 t = time.time()
-                kws[name] = ex.get_keywords(doc)
+
+                text_extraction_func = (
+                    lambda x: f"[CLS] {clean_ru_text(x.claims)}  {clean_ru_text(x.abstract)} [CLS] {clean_ru_text(x.description)}"
+                )
+
+                kw = ex.get_keywords(
+                    doc,
+                    text_extraction_func=text_extraction_func,
+                )
+
+                kws[name] = kw
 
                 performance[name][0] += time.time() - t
                 performance[name][1] += 1
@@ -97,6 +133,12 @@ async def main(num_of_docs=None, name_of_experiment="KWE"):
     for k, v in performance.items():
         if v[1]:
             logger.info(f"{k} : {round(v[0]/v[1], 2)} s")
+
+    with open(
+        BASE_DATA_PATH / "eval" / "names_of_methods.json", "w+", encoding="utf-8"
+    ) as file:
+        names = [i.get_name() for i in extractors]
+        json.dump(names, file, indent=4, ensure_ascii=False)
 
 
 if __name__ == "__main__":
