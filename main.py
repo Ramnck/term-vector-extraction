@@ -19,6 +19,7 @@ import asyncio
 import time
 from pathlib import Path
 import json
+import numpy as np
 
 from sentence_transformers import SentenceTransformer
 
@@ -45,33 +46,58 @@ async def main(num_of_docs=None, name_of_experiment="KWE"):
     loader = FileSystem("data\\raw\\skolkovo")
 
     extractors = [
-        RAKExtractor(),
         YAKExtractor(),
-        KeyBERTExtractor(method_name="paraphrase-multilingual-MiniLM-L12-v2"),
+        KeyBERTExtractor(
+            "paraphrase-multilingual-MiniLM-L12-v2", method_name="standart"
+        ),
         KeyBERTExtractor(
             KeyBERTModel(RuLongrormerEmbedder()),
-            method_name="ru-longformer-tiny-16384",
+            method_name="ru-longformer",
+            text_extraction_func=lambda doc: f"[CLS] {clean_ru_text(doc.claims)}  {clean_ru_text(doc.abstract)} [CLS] {clean_ru_text(doc.description)}",
         ),
         KeyBERTExtractor(
             SentenceTransformer("DiTy/bi-encoder-russian-msmarco"),
-            "bi-encoder-russian-msmarco",
+            "bi-encoder-ru",
         ),
         KeyBERTExtractor(
-            SentenceTransformer("cointegrated/rubert-tiny2"), "rubert-tiny2"
+            SentenceTransformer("cointegrated/rubert-tiny2"), "rubert-tiny"
+        ),
+        KeyBERTExtractor(SentenceTransformer("all-mpnet-base-v2"), "all-mpnet"),
+        KeyBERTExtractor(
+            SentenceTransformer("sentence-transformers/multi-qa-mpnet-base-dot-v1"),
+            "multi-qa-mpnet",
+        ),
+        KeyBERTExtractor(
+            SentenceTransformer(
+                "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+            ),
+            "multilingual-mpnet",
+        ),
+        KeyBERTExtractor(
+            SentenceTransformer("sentence-transformers/allenai-specter"),
+            "allenai-specter",
+        ),
+        KeyBERTExtractor(
+            SentenceTransformer(
+                "sentence-transformers/distiluse-base-multilingual-cased-v2"
+            ),
+            "distiluse-base",
+        ),
+        KeyBERTExtractor(
+            SentenceTransformer("intfloat/multilingual-e5-large"),
+            "e5-large",
+            text_extraction_func=lambda doc: "query: " + clean_ru_text(doc.text),
+        ),
+        KeyBERTExtractor(
+            SentenceTransformer("deepvk/USER-bge-m3"),
+            "USER-bge",
+            text_extraction_func=lambda doc: "query: " + clean_ru_text(doc.text),
         ),
     ]
 
-    with open(
-        BASE_DATA_PATH / "eval" / "names_of_methods.json", "w+", encoding="utf-8"
-    ) as file:
-        names = [i.get_name() for i in extractors]
-        json.dump(names, file, indent=4, ensure_ascii=False)
-
-    exit()
-
     logger.info("Начало обработки")
 
-    performance = {i.get_name(): [0, 0] for i in extractors}
+    performance = {i.get_name(): {"document": [], "time": []} for i in extractors}
     last_indicated_percent = -99999
     num_of_doc = 0
 
@@ -87,19 +113,12 @@ async def main(num_of_docs=None, name_of_experiment="KWE"):
             try:
                 t = time.time()
 
-                text_extraction_func = (
-                    lambda x: f"[CLS] {clean_ru_text(x.claims)}  {clean_ru_text(x.abstract)} [CLS] {clean_ru_text(x.description)}"
-                )
-
-                kw = ex.get_keywords(
-                    doc,
-                    text_extraction_func=text_extraction_func,
-                )
+                kw = ex.get_keywords(doc, use_mmr=True)
 
                 kws[name] = kw
 
-                performance[name][0] += time.time() - t
-                performance[name][1] += 1
+                performance[name]["time"].append(time.time() - t)
+                performance[name]["document"].append(doc.id)
 
             except Exception as eee:
                 logger.error(f"Exception in extractor for: {eee}")
@@ -127,18 +146,18 @@ async def main(num_of_docs=None, name_of_experiment="KWE"):
         num_of_doc += 1
         if num_of_doc * 100 // num_of_docs >= last_indicated_percent:
             last_indicated_percent = num_of_doc * 100 // num_of_docs
-            logger.info(f"{last_indicated_percent} % done")
+            logger.info(f"{last_indicated_percent} % done ({num_of_doc} docs)")
 
     logger.info("Средняя скорость работы алгоритмов:")
-    for k, v in performance.items():
-        if v[1]:
-            logger.info(f"{k} : {round(v[0]/v[1], 2)} s")
+    for extractor_name, value in performance.items():
+        mean_time = np.mean(value["time"])
+        out = f"{extractor_name} : {round(mean_time, 2)} s"
+        logger.info(out)
 
     with open(
-        BASE_DATA_PATH / "eval" / "names_of_methods.json", "w+", encoding="utf-8"
+        BASE_DATA_PATH / "eval" / "performance.json", "w+", encoding="utf-8"
     ) as file:
-        names = [i.get_name() for i in extractors]
-        json.dump(names, file, indent=4, ensure_ascii=False)
+        json.dump(performance, file, indent=4, ensure_ascii=False)
 
 
 if __name__ == "__main__":

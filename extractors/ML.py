@@ -92,6 +92,8 @@ class KeyBERTModel:
                      selection of keywords/keyphrases.
         """
 
+        # add vectorizer
+
         lemmatized_text = lemmatize_doc(document, stopwords_ru)
 
         words = [word for word in set(lemmatized_text.split()) if word]
@@ -121,22 +123,19 @@ class KeyBERTModel:
 
 class KeyBERTExtractor(KeyWordExtractorBase):
     def __init__(
-        self,
-        model: str | KeyBERTModel | Any = "paraphrase-multilingual-MiniLM-L12-v2",
-        method_name: str = "KBRT",
+        self, model: str | KeyBERTModel | Any, method_name: str = "KBRT", **kwargs
     ) -> None:
         self.method_name = method_name
         if isinstance(model, KeyBERTModel):
             self.model = model
         else:
             self.model = KeyBERT(model)
-
-    def get_keywords(self, doc: DocumentBase, num=50, **kwargs) -> list:
-        text_extraction_func = kwargs.get(
+        self.text_extraction_func = kwargs.get(
             "text_extraction_func", lambda doc: clean_ru_text(doc.text)
         )
 
-        text = text_extraction_func(doc)
+    def get_keywords(self, doc: DocumentBase, num=50, **kwargs) -> list:
+        text = self.text_extraction_func(doc)
 
         out = self.model.extract_keywords(
             text,

@@ -2,6 +2,8 @@ from pymorphy3 import MorphAnalyzer
 import nltk.corpus
 import re
 
+from typing import Callable
+from api import DocumentBase
 
 morph = MorphAnalyzer()
 
@@ -53,3 +55,19 @@ def lemmatize_doc(doc: str | list[str], stopwords: list[str]) -> str:
     if len(tokens) > 2:
         return " ".join(tokens)
     return None
+
+
+def replace_words_with_custom_function(
+    text: str, custom_function: Callable[[str], str]
+):
+    # Function to replace a Russian word using the custom function
+    def apply_custom_function(match):
+        return custom_function(match.group(0))
+
+    # Regex pattern that matches Russian words (sequences of Cyrillic characters)
+    cyrillic_pattern = r"\b[а-яА-ЯёЁ]+\b"
+
+    # Use re.sub with the regex pattern
+    result = re.sub(cyrillic_pattern, apply_custom_function, text)
+
+    return result
