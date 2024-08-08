@@ -56,11 +56,11 @@ class LoaderBase(ABC):
         raise NotImplementedError
 
     # Iterate over documents
-    def __aiter__(self):
-        raise NotImplementedError
+    # def __aiter__(self):
+    #     raise NotImplementedError
 
-    async def __anext__(self) -> DocumentBase:
-        raise NotImplementedError
+    # async def __anext__(self) -> DocumentBase:
+    #     raise NotImplementedError
 
 
 class EmbedderBase(ABC):

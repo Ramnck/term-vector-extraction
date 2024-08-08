@@ -41,58 +41,58 @@ def find_last_file(base_name_of_file: Path):
     return name_of_file
 
 
-async def main(num_of_docs=None, name_of_experiment="KWE"):
+async def main(num_of_docs: int | None = None, name_of_experiment: str = "KWE"):
     api = FipsAPI(FIPS_API_KEY)
     loader = FileSystem("data\\raw\\skolkovo")
 
     extractors = [
         YAKExtractor(),
-        KeyBERTExtractor(
-            "paraphrase-multilingual-MiniLM-L12-v2", method_name="standart"
-        ),
-        KeyBERTExtractor(
-            KeyBERTModel(RuLongrormerEmbedder()),
-            method_name="ru-longformer",
-            text_extraction_func=lambda doc: f"[CLS] {clean_ru_text(doc.claims)}  {clean_ru_text(doc.abstract)} [CLS] {clean_ru_text(doc.description)}",
-        ),
-        KeyBERTExtractor(
-            SentenceTransformer("DiTy/bi-encoder-russian-msmarco"),
-            "bi-encoder-ru",
-        ),
-        KeyBERTExtractor(
-            SentenceTransformer("cointegrated/rubert-tiny2"), "rubert-tiny"
-        ),
-        KeyBERTExtractor(SentenceTransformer("all-mpnet-base-v2"), "all-mpnet"),
-        KeyBERTExtractor(
-            SentenceTransformer("sentence-transformers/multi-qa-mpnet-base-dot-v1"),
-            "multi-qa-mpnet",
-        ),
+        # KeyBERTExtractor(
+        #     "paraphrase-multilingual-MiniLM-L12-v2", method_name="standart"
+        # ),
+        # KeyBERTExtractor(
+        #     KeyBERTModel(RuLongrormerEmbedder()),
+        #     method_name="ru-longformer",
+        #     text_extraction_func=lambda doc: f"[CLS] {clean_ru_text(doc.claims)}  {clean_ru_text(doc.abstract)} [CLS] {clean_ru_text(doc.description)}",
+        # ),
+        # KeyBERTExtractor(
+        #     SentenceTransformer("DiTy/bi-encoder-russian-msmarco"),
+        #     "bi-encoder-ru",
+        # ),
+        # KeyBERTExtractor(
+        #     SentenceTransformer("cointegrated/rubert-tiny2"), "rubert-tiny"
+        # ),
+        # KeyBERTExtractor(SentenceTransformer("all-mpnet-base-v2"), "all-mpnet"),
+        # KeyBERTExtractor(
+        #     SentenceTransformer("sentence-transformers/multi-qa-mpnet-base-dot-v1"),
+        #     "multi-qa-mpnet",
+        # ),
         KeyBERTExtractor(
             SentenceTransformer(
                 "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
             ),
             "multilingual-mpnet",
         ),
-        KeyBERTExtractor(
-            SentenceTransformer("sentence-transformers/allenai-specter"),
-            "allenai-specter",
-        ),
-        KeyBERTExtractor(
-            SentenceTransformer(
-                "sentence-transformers/distiluse-base-multilingual-cased-v2"
-            ),
-            "distiluse-base",
-        ),
+        # KeyBERTExtractor(
+        #     SentenceTransformer("sentence-transformers/allenai-specter"),
+        #     "allenai-specter",
+        # ),
+        # KeyBERTExtractor(
+        #     SentenceTransformer(
+        #         "sentence-transformers/distiluse-base-multilingual-cased-v2"
+        #     ),
+        #     "distiluse-base",
+        # ),
         KeyBERTExtractor(
             SentenceTransformer("intfloat/multilingual-e5-large"),
             "e5-large",
             text_extraction_func=lambda doc: "query: " + clean_ru_text(doc.text),
         ),
-        KeyBERTExtractor(
-            SentenceTransformer("deepvk/USER-bge-m3"),
-            "USER-bge",
-            # text_extraction_func=lambda doc: "query: " + clean_ru_text(doc.text),
-        ),
+        # KeyBERTExtractor(
+        #     SentenceTransformer("deepvk/USER-bge-m3"),
+        #     "USER-bge",
+        #     # text_extraction_func=lambda doc: "query: " + clean_ru_text(doc.text),
+        # ),
     ]
 
     logger.info("Начало обработки")
@@ -137,7 +137,7 @@ async def main(num_of_docs=None, name_of_experiment="KWE"):
         data["relevant"] = relevant
 
         with open(
-            BASE_DATA_PATH / "eval" / "kwe" / (doc.id + ".json"),
+            BASE_DATA_PATH / "eval" / name_of_experiment / (doc.id + ".json"),
             "w+",
             encoding="utf-8",
         ) as file:
@@ -163,4 +163,4 @@ async def main(num_of_docs=None, name_of_experiment="KWE"):
 if __name__ == "__main__":
     # import profile
     # profile.run('main(1)')
-    asyncio.run(main(79))
+    asyncio.run(main(79), "ckwe")

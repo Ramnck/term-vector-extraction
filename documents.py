@@ -44,6 +44,58 @@ class FipsAPI(LoaderBase):
     def __init__(self, api_key) -> None:
         self.api_key = api_key
 
+    @property
+    def _headers(self) -> dict:
+        return {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+
+    def _format_value(self, in_value: str | int) -> str:
+        if isinstance(in_value, str):
+            return '"' + in_value + '"'
+        elif isinstance(in_value, int):
+            return str(in_value)
+
+    def _format_list(self, in_list: list) -> str:
+        out = ""
+        out += "["
+        for value in in_list:
+            value = self._format_value(value)
+            out += value + ", "
+        out = out[:-2]
+        out += "]"
+        return out
+
+    def _format_dict(self, in_dict: dict) -> str:
+        out = ""
+        out += "{"
+        for key, value in in_dict.items():
+            key = self._format_value(key)
+            if isinstance(value, str) or isinstance(value, int):
+                value = self._format_value(value)
+            elif isinstance(value, dict):
+                value = self._format_dict(value)
+            elif isinstance(value, list):
+                value = self._format_list(value)
+
+            out += "{0}: {1}, ".format(key, value)
+
+        out = out[:-2]
+        out += "}"
+        return out
+
+    async def _search_query(self, **kwargs) -> dict:
+        async with aiohttp.ClientSession() as session:
+            data = self._format_dict(kwargs)
+
+            async with session.post(
+                self.api_url + "search",
+                data=data.encode("utf-8"),
+                headers=self._headers,
+            ) as res:
+                return await res.json()
+
     async def get_doc(self, id_date: str) -> FipsDoc:
         async with aiohttp.ClientSession() as session:
             async with session.get(
@@ -52,31 +104,7 @@ class FipsAPI(LoaderBase):
                 try:
                     return FipsDoc(await res.json())
                 except aiohttp.ContentTypeError as ex:
-                    # pprint(res.text)
                     raise Exception("Invalid JSON response")
-
-    @property
-    def _headers(self) -> dict:
-        return {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-        }
-
-    async def _search_query(self, **kwargs) -> dict:
-        async with aiohttp.ClientSession() as session:
-            data = ""
-            for key, value in kwargs.items():
-                data += '"{0}": {1}, '.format(
-                    key, '"' + value + '"' if type(value) == str else value
-                )
-            data = "{" + data[:-2] + "}"
-
-            async with session.post(
-                self.api_url + "search",
-                data=data.encode("utf-8"),
-                headers=self._headers,
-            ) as res:
-                return await res.json()
 
     async def get_random_doc(self) -> FipsDoc:
         res = await self._search_query(q=random.choice(rand_terms), limit=20)
@@ -88,6 +116,22 @@ class FipsAPI(LoaderBase):
         docs = [i["id"][: i["id"].index("_")] for i in res.get("hits", [])]
 
         return docs
+
+    async def find_doc_by_id(self, doc_id: str) -> FipsDoc:
+        doc_country = doc_id[:2]
+        if doc_id[-2] in "0123456789":
+            doc_kind = doc_id[-1:]
+        else:
+            doc_kind = doc_id[-2:]
+        doc_number = doc_id[2 : -len(doc_kind)]
+
+        query_filter = {
+            "country": {"values": [doc_country]},
+            "kind": {"values": [doc_kind]},
+            "document_number": {"values": [doc_number]},
+        }
+        res = await self._search_query(limit=1, filter=query_filter)
+        return FipsDoc(res["hits"][0])
 
 
 class XMLDoc(DocumentBase):
@@ -183,7 +227,7 @@ class XMLDoc(DocumentBase):
         return tag.text
 
     @property
-    def cluster(self) -> set:
+    def cluster(self) -> set[str]:
         xml = self.xml_obj
         out = set()
 
