@@ -17,7 +17,7 @@ class FipsDoc(DocumentBase):
         self.raw_json = raw
 
     @property
-    def citations(self) -> list:
+    def citations(self) -> list[str]:
         return [i["identity"] for i in self.raw_json["common"]["citated_docs"]]
 
     def get_xml(self):
@@ -87,14 +87,19 @@ class XMLDoc(DocumentBase):
         com = f"{{{xmlschema_address}/Common}}"
         pat = f"{{{xmlschema_address}/Patent}}"
 
-    def __init__(self, raw_text) -> None:
-        self.xml_obj = ET.fromstring(raw_text)
+    def __init__(self, raw: ET.Element | str) -> None:
+        if isinstance(raw, ET.Element):
+            self.xml_obj = raw
+        else:
+            self.xml_obj = ET.fromstring(raw)
 
     @property
-    def citations(self) -> list:
+    def citations(self) -> list[str]:
         tag = self.xml_obj.find(XMLDoc.Namespace.pat + "BibliographicData")
         tag = tag.find(XMLDoc.Namespace.pat + "ReferenceCitationBag")
         refs = []
+        if tag is None:
+            return []
         for i in tag.findall(XMLDoc.Namespace.pat + "ReferenceCitationFreeFormat"):
             if i.text:
                 refs.append(i.text)
@@ -143,10 +148,58 @@ class XMLDoc(DocumentBase):
 
     @property
     def id(self) -> str:
-        c = self.xml_obj.find(XMLDoc.Namespace.com + "IPOfficeCode")
-        n = self.xml_obj.find(XMLDoc.Namespace.pat + "PublicationNumber")
-        k = self.xml_obj.find(XMLDoc.Namespace.com + "PatentDocumentKindCode")
-        return c.text + n.text.lstrip("0") + k.text
+        def extract_id(tag: ET.Element) -> str:
+            c = tag.find(XMLDoc.Namespace.com + "IPOfficeCode")
+            n = tag.find(XMLDoc.Namespace.pat + "PublicationNumber")
+            k = tag.find(XMLDoc.Namespace.com + "PatentDocumentKindCode")
+
+            # check if there is a None
+            if c is None or n is None or k is None:
+                return None
+            else:
+                return c.text + n.text.lstrip("0") + k.text
+
+        id_temp = extract_id(self.xml_obj)
+        if id_temp is None:
+            id_temp = extract_id(
+                self.xml_obj.find(XMLDoc.Namespace.pat + "BibliographicData")
+            )
+
+        return id_temp
+
+    @property
+    def cluster(self) -> set:
+        xml = self.xml_obj
+        out = set()
+
+        raw_str_xmls = set()
+
+        raw_str_xmls.add(xml)
+
+        citation_docs = xml.find(XMLDoc.Namespace.pat + "DocumentCitationBag")
+        if citation_docs is not None:
+            raw_str_xmls |= set(
+                citation_docs.findall(XMLDoc.Namespace.pat + "DocumentCitation")
+            )
+
+        analog_cited_docs = xml.find(XMLDoc.Namespace.pat + "AnalogOfCitationBag")
+        if analog_cited_docs is not None:
+            raw_str_xmls |= set(
+                analog_cited_docs.findall(XMLDoc.Namespace.pat + "AnalogOfCitation")
+            )
+
+        analog_docs = xml.find(XMLDoc.Namespace.pat + "DocumentAnalogBag")
+        if analog_docs is not None:
+            raw_str_xmls |= set(
+                analog_docs.findall(XMLDoc.Namespace.pat + "DocumentAnalog")
+            )
+
+        for raw_str_xml in raw_str_xmls:
+            temp_doc = XMLDoc(raw_str_xml)
+            out.add(temp_doc.id)
+            out |= set(temp_doc.citations)
+
+        return out
 
 
 class FileSystem(LoaderBase):
@@ -181,5 +234,9 @@ class FileSystem(LoaderBase):
             doc_path = next(self.diriter)
         except StopIteration:
             raise StopAsyncIteration
+
+        if doc_path.is_dir():
+            for file in doc_path.iterdir():
+                doc_path = file
 
         return await self._open_file(doc_path)

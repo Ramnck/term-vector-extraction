@@ -7,7 +7,7 @@ class DocumentBase(ABC):
         raise NotImplementedError
 
     @property
-    def citations(self) -> list:
+    def citations(self) -> list[str]:
         raise NotImplementedError
 
     @property
