@@ -14,9 +14,9 @@ morph = MorphAnalyzer()
 
 
 def clean_ru_text(text) -> str:
-    pattern = re.compile(r"[а-яА-ЯёЁ]+(?:-[а-яА-ЯёЁ]+)*|\s+")
+    pattern = re.compile(r"(\w[-\w]*)")
     russian_letters_and_spaces = pattern.findall(text)
-    cleaned_string = "".join(russian_letters_and_spaces)
+    cleaned_string = " ".join(russian_letters_and_spaces)
     return cleaned_string
 
 
@@ -29,8 +29,10 @@ with open("SimilarStopWords.txt", encoding="utf-8") as file:
 with open("MyStopWords.txt", encoding="utf-8") as file:
     stopwords_my = [i.strip() for i in file]
 stopwords_nltk_ru = list(nltk.corpus.stopwords.words("russian"))
+stopwords_nltk_en = list(nltk.corpus.stopwords.words("english"))
 
 stopwords_ru = set()
+stopwords_ru |= set(stopwords_nltk_en)
 for word in stopwords_my:
     stopwords_ru.add(lemmatize_ru_word(word))
 for word in stopwords_nltk_ru:

@@ -74,7 +74,7 @@ class KeyBERTModel:
         document: str,
         top_n: int = 50,
         use_mmr: bool = False,
-        diversity: float = 0.5,
+        diversity: float = 0.7,
         nr_candidates: int = 20,
         **kwargs
     ) -> list[tuple[str, float]]:
@@ -134,14 +134,13 @@ class KeyBERTExtractor(KeyWordExtractorBase):
             "text_extraction_func", lambda doc: clean_ru_text(doc.text)
         )
 
-    def get_keywords(self, doc: DocumentBase, num=50, **kwargs) -> list:
+    def get_keywords(
+        self, doc: DocumentBase, num=50, use_mmr=False, diversity=0.7, **kwargs
+    ) -> list:
         text = self.text_extraction_func(doc)
 
         out = self.model.extract_keywords(
-            text,
-            top_n=num,
-            use_mmr=kwargs.get("use_mmr", False),
-            use_maxsum=kwargs.get("use_maxsum", False),
+            text, top_n=num, use_mmr=use_mmr, diversity=diversity
         )
 
         return [i[0] for i in out]

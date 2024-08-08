@@ -91,7 +91,7 @@ async def main(num_of_docs=None, name_of_experiment="KWE"):
         KeyBERTExtractor(
             SentenceTransformer("deepvk/USER-bge-m3"),
             "USER-bge",
-            text_extraction_func=lambda doc: "query: " + clean_ru_text(doc.text),
+            # text_extraction_func=lambda doc: "query: " + clean_ru_text(doc.text),
         ),
     ]
 

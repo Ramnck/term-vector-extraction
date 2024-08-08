@@ -53,7 +53,6 @@ class FipsAPI(LoaderBase):
             "Content-Type": "application/json",
         }
 
-    # async def _search_query(self, query: str, limit: int = 20, offset: int = 0) -> dict:
     async def _search_query(self, **kwargs) -> dict:
         async with aiohttp.ClientSession() as session:
             data = ""
@@ -87,7 +86,6 @@ class XMLDoc(DocumentBase):
         xmlschema_address = "http://www.wipo.int/standards/XMLSchema/ST96"
         com = f"{{{xmlschema_address}/Common}}"
         pat = f"{{{xmlschema_address}/Patent}}"
-        # pat = "{http://www.wipo.int/standards/XMLSchema/ST96/Patent}"
 
     def __init__(self, raw_text) -> None:
         self.xml_obj = ET.fromstring(raw_text)
@@ -119,7 +117,6 @@ class XMLDoc(DocumentBase):
     @property
     def claims(self) -> str:
         claims_root = self.xml_obj.find(XMLDoc.Namespace.pat + "Claims")
-        # тут сложно можно просто 2 for
 
         claims = []
 
@@ -139,14 +136,6 @@ class XMLDoc(DocumentBase):
                     abstracts.append(p.text)
 
         return " ".join(abstracts)
-
-    # @property
-    # def abstract(self) -> str:
-    #     abstract = self.xml_obj.findall(XMLDoc.Namespace.pat + "Abstract")
-    #     abstract = [" ".join([p.text for p in ab]) for ab in abstract]
-    #     abstract = " ".join(abstract)
-
-    #     return abstract
 
     @property
     def text(self) -> str:
@@ -194,10 +183,3 @@ class FileSystem(LoaderBase):
             raise StopAsyncIteration
 
         return await self._open_file(doc_path)
-
-    # def __iter__(self):
-    # self.iterdir = self.init_path.iterdir()
-    # return self
-
-    # def __next__(self) -> str:
-    # return next(self.iterdir).stem

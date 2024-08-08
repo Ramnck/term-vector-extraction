@@ -16,8 +16,6 @@ async def main(name_of_file: str | Path):
         "no_relevant": 0,
     }
 
-    # methods = ["RAKE", "YAKE", "KBRT", "RULF"]
-
     with open(base_path / "names_of_methods.json", encoding="utf-8") as file:
         methods = json.load(file)
 
@@ -63,9 +61,9 @@ async def main(name_of_file: str | Path):
             if metric in ["self_top1", "no_relevant"]:
                 eval[metric] = round(eval[metric] / len(list_of_files))
             elif metric != "all_docs":
-                eval[metric] = round(eval[metric] / eval["all_docs"], 2)
+                eval[metric] = round(eval[metric] / eval["all_docs"], 4)
 
-            print(metric, "-", round(eval[metric], 2))
+            print(metric, "-", round(eval[metric], 4))
         print()
 
     if doc_without_56:
