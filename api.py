@@ -18,8 +18,16 @@ class DocumentBase(ABC):
     def id(self) -> str:
         raise NotImplementedError
 
-    def __hash__(self) -> int:
+    @property
+    def date(self) -> str:
         raise NotImplementedError
+
+    @property
+    def id_date(self) -> str:
+        return self.id + "_" + self.date
+
+    def __hash__(self) -> int:
+        return hash(self.id)
 
 
 class KeyWordExtractorBase(ABC):

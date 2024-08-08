@@ -30,7 +30,12 @@ class FipsDoc(DocumentBase):
 
     @property
     def id(self) -> str:
-        return self.raw_json["id"]
+        temp = self.raw_json["id"]
+        return temp[: temp.index("_")]
+
+    @property
+    def date(self) -> str:
+        return self.raw_json["common"]["publication_date"].replace(".", "")
 
 
 class FipsAPI(LoaderBase):
@@ -39,12 +44,16 @@ class FipsAPI(LoaderBase):
     def __init__(self, api_key) -> None:
         self.api_key = api_key
 
-    async def get_doc(self, id: str) -> FipsDoc:
+    async def get_doc(self, id_date: str) -> FipsDoc:
         async with aiohttp.ClientSession() as session:
             async with session.get(
-                self.api_url + "docs/" + id, headers=self._headers
+                self.api_url + "docs/" + id_date, headers=self._headers
             ) as res:
-                return FipsDoc(await res.json())
+                try:
+                    return FipsDoc(await res.json())
+                except aiohttp.ContentTypeError as ex:
+                    # pprint(res.text)
+                    raise Exception("Invalid JSON response")
 
     @property
     def _headers(self) -> dict:
@@ -160,12 +169,18 @@ class XMLDoc(DocumentBase):
                 return c.text + n.text.lstrip("0") + k.text
 
         id_temp = extract_id(self.xml_obj)
+
         if id_temp is None:
             id_temp = extract_id(
                 self.xml_obj.find(XMLDoc.Namespace.pat + "BibliographicData")
             )
 
         return id_temp
+
+    @property
+    def date(self) -> set:
+        tag = self.xml_obj.find(XMLDoc.Namespace.com + "PublicationDate")
+        return tag.text
 
     @property
     def cluster(self) -> set:
