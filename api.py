@@ -24,6 +24,8 @@ class DocumentBase(ABC):
 
     @property
     def id_date(self) -> str:
+        if self.id is None or self.date is None:
+            return None
         return self.id + "_" + self.date
 
     def __hash__(self) -> int:
@@ -54,13 +56,6 @@ class LoaderBase(ABC):
 
     async def find_relevant_by_keywords(self, kws) -> list:
         raise NotImplementedError
-
-    # Iterate over documents
-    # def __aiter__(self):
-    #     raise NotImplementedError
-
-    # async def __anext__(self) -> DocumentBase:
-    #     raise NotImplementedError
 
 
 class EmbedderBase(ABC):

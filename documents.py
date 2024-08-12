@@ -4,11 +4,13 @@ import aiohttp
 import aiofiles
 import xml.etree.ElementTree as ET
 import re
+import json
+import logging
 from enum import StrEnum
 
 from pathlib import Path
 
-
+logger = logging.getLogger(__name__)
 rand_terms = "ракета машина смазка установка самолет вертолёт автомат мотоцикл насос инструмент лист дерево обработка рост эволюция".split()
 
 
@@ -20,13 +22,48 @@ class FipsDoc(DocumentBase):
     def citations(self) -> list[str]:
         return [i["identity"] for i in self.raw_json["common"]["citated_docs"]]
 
-    def get_xml(self):
+    @property
+    def xml(self):
         tree = ET.fromstring(self.raw_json["description"]["ru"])
         return tree
 
     @property
+    def description(self) -> str:
+        json_description = self.raw_json.get("description", {}).get("ru", "")
+        if json_description:
+            xml = ET.fromstring(json_description)
+            return " ".join(i.text for i in xml if i.text is not None)
+        else:
+            return ""
+
+    @property
+    def abstract(self) -> str:
+        json_abstract = self.raw_json.get("abstract", {}).get("ru", "")
+        if json_abstract:
+            xml = ET.fromstring(json_abstract)
+            return " ".join(i.text for i in xml if i.text is not None)
+        else:
+            return ""
+
+    @property
+    def claims(self) -> str:
+        json_claims = self.raw_json.get("claims", {}).get("ru", "")
+        if json_claims:
+            xml = ET.fromstring(self.raw_json["claims"]["ru"])
+            out = ""
+            for i in xml:
+                if i.text is not None:
+                    out += i.text + " "
+                for j in i:
+                    if j.text is not None:
+                        out += j.text + " "
+            return out
+        else:
+            return ""
+
+    @property
     def text(self) -> str:
-        return "\n".join(i.text for i in self.get_xml() if i.text is not None)
+        return " ".join([self.abstract, self.claims, self.description])
 
     @property
     def id(self) -> str:
@@ -51,43 +88,9 @@ class FipsAPI(LoaderBase):
             "Content-Type": "application/json",
         }
 
-    def _format_value(self, in_value: str | int) -> str:
-        if isinstance(in_value, str):
-            return '"' + in_value + '"'
-        elif isinstance(in_value, int):
-            return str(in_value)
-
-    def _format_list(self, in_list: list) -> str:
-        out = ""
-        out += "["
-        for value in in_list:
-            value = self._format_value(value)
-            out += value + ", "
-        out = out[:-2]
-        out += "]"
-        return out
-
-    def _format_dict(self, in_dict: dict) -> str:
-        out = ""
-        out += "{"
-        for key, value in in_dict.items():
-            key = self._format_value(key)
-            if isinstance(value, str) or isinstance(value, int):
-                value = self._format_value(value)
-            elif isinstance(value, dict):
-                value = self._format_dict(value)
-            elif isinstance(value, list):
-                value = self._format_list(value)
-
-            out += "{0}: {1}, ".format(key, value)
-
-        out = out[:-2]
-        out += "}"
-        return out
-
     async def _search_query(self, **kwargs) -> dict:
         async with aiohttp.ClientSession() as session:
-            data = self._format_dict(kwargs)
+            data = json.dumps(kwargs)
 
             async with session.post(
                 self.api_url + "search",
@@ -96,7 +99,7 @@ class FipsAPI(LoaderBase):
             ) as res:
                 return await res.json()
 
-    async def get_doc(self, id_date: str) -> FipsDoc:
+    async def get_doc(self, id_date: str) -> FipsDoc | None:
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 self.api_url + "docs/" + id_date, headers=self._headers
@@ -104,37 +107,63 @@ class FipsAPI(LoaderBase):
                 try:
                     return FipsDoc(await res.json())
                 except aiohttp.ContentTypeError as ex:
-                    raise Exception("Invalid JSON response")
+                    logger.error(id_date + " document not found")
+                    return None
 
     async def get_random_doc(self) -> FipsDoc:
         res = await self._search_query(q=random.choice(rand_terms), limit=20)
         doc = random.choice(res["hits"])
         return await self.get_doc(doc["id"])
 
-    async def find_relevant_by_keywords(self, kws: list, num_of_docs=20) -> list:
-        res = await self._search_query(q=" OR ".join(kws), offset=1, limit=num_of_docs)
-        docs = [i["id"][: i["id"].index("_")] for i in res.get("hits", [])]
+    async def find_relevant_by_keywords(
+        self, kws: list, num_of_docs=20, offset=0
+    ) -> list[str]:
+        res = await self._search_query(
+            q=" OR ".join(kws), offset=offset, limit=num_of_docs
+        )
+        docs = [
+            re.sub(r"[^0-9a-zA-Zа-яА-Я_]", "", i["id"]) for i in res.get("hits", [])
+        ]
 
         return docs
 
-    async def find_doc_by_id(self, doc_id: str) -> FipsDoc:
-        doc_country = doc_id[:2]
-        if doc_id[-2] in "0123456789":
-            doc_kind = doc_id[-1:]
-        else:
-            doc_kind = doc_id[-2:]
-        doc_number = doc_id[2 : -len(doc_kind)]
-
-        query_filter = {
-            "country": {"values": [doc_country]},
-            "kind": {"values": [doc_kind]},
-            "document_number": {"values": [doc_number]},
-        }
-        res = await self._search_query(limit=1, filter=query_filter)
-        return FipsDoc(res["hits"][0])
-
 
 class XMLDoc(DocumentBase):
+    def extract_citaions(text: str) -> list[str]:
+        # Регулярное выражение для патентной заявки
+        pattern = (
+            r"\b[A-Z]{2} ?\d+ ?[A-ZА-Я]\d?, ?\d{2,4}[ .,/\\-]\d{2}[ .,/\\-]\d{2,4}\b"
+        )
+
+        # Найти все патентные документы в строке
+        matches = re.findall(pattern, text)
+        out = []
+        for match in matches:
+            id_date = match.split(", ")
+            if len(id_date) == 1:
+                id_date = match.split(",")
+
+            if len(id_date) < 2:
+                continue
+
+            id = re.sub(r"[^0-9a-zA-Zа-яА-Я]", "", id_date[0])
+            date = id_date[1:]
+
+            if len(date) == 1:
+                date = date[0]
+                if date[2] in "1234567890":  # YYYY/MM/DD
+                    date = "".join(re.findall(r"\d+", date))
+                else:  # DD/MM/YYYY
+                    date = "".join(date.split(date[2])[::-1])
+            else:
+                if len(date[0]) > 2:  # YYYY,MM,DD
+                    date = "".join(date)
+                else:  # DD,MM,YYYY
+                    date = "".join(date[::-1])
+
+            out.append(id + "_" + date)
+        return out
+
     class Namespace(StrEnum):
         xmlschema_address = "http://www.wipo.int/standards/XMLSchema/ST96"
         com = f"{{{xmlschema_address}/Common}}"
@@ -147,12 +176,12 @@ class XMLDoc(DocumentBase):
             self.xml_obj = ET.fromstring(raw)
 
     @property
-    def citations(self) -> list[str]:
+    def _raw_citations_field(self) -> str:
         tag = self.xml_obj.find(XMLDoc.Namespace.pat + "BibliographicData")
         tag = tag.find(XMLDoc.Namespace.pat + "ReferenceCitationBag")
         refs = []
         if tag is None:
-            return []
+            return ""
         for i in tag.findall(XMLDoc.Namespace.pat + "ReferenceCitationFreeFormat"):
             if i.text:
                 refs.append(i.text)
@@ -161,10 +190,13 @@ class XMLDoc(DocumentBase):
                     refs.append(j.text)
         citations = " ".join(refs)
 
-        pattern = r"\b[A-Z]{2} ?\d+ ?[A-ZА-Я]\d?\b"
-        matches = re.findall(pattern, citations)
+        return citations
 
-        return [x.replace(" ", "") for x in matches]
+    @property
+    def citations(self) -> list[str]:
+        citations = self._raw_citations_field
+
+        return XMLDoc.extract_citaions(citations)
 
     @property
     def description(self) -> str:
@@ -197,7 +229,7 @@ class XMLDoc(DocumentBase):
 
     @property
     def text(self) -> str:
-        return "\n".join([self.description, self.claims, self.abstract])
+        return " ".join([self.description, self.claims, self.abstract])
 
     @property
     def id(self) -> str:
@@ -215,15 +247,27 @@ class XMLDoc(DocumentBase):
         id_temp = extract_id(self.xml_obj)
 
         if id_temp is None:
-            id_temp = extract_id(
-                self.xml_obj.find(XMLDoc.Namespace.pat + "BibliographicData")
-            )
+            tag = self.xml_obj.find(XMLDoc.Namespace.pat + "BibliographicData")
+            tags = tag.findall(XMLDoc.Namespace.pat + "PatentPublicationIdentification")
+            for i in tags:
+                if i.attrib[XMLDoc.Namespace.pat + "dataFormat"] == "original":
+                    tag = i
+                    break
+            id_temp = extract_id(tag)
 
         return id_temp
 
     @property
     def date(self) -> set:
         tag = self.xml_obj.find(XMLDoc.Namespace.com + "PublicationDate")
+        if tag is None:
+            tag = self.xml_obj.find(XMLDoc.Namespace.pat + "BibliographicData")
+            tags = tag.findall(XMLDoc.Namespace.pat + "PatentPublicationIdentification")
+            for i in tags:
+                if i.attrib[XMLDoc.Namespace.pat + "dataFormat"] == "original":
+                    tag = i
+                    break
+            tag = tag.find(XMLDoc.Namespace.com + "PublicationDate")
         return tag.text
 
     @property
@@ -255,7 +299,8 @@ class XMLDoc(DocumentBase):
 
         for raw_str_xml in raw_str_xmls:
             temp_doc = XMLDoc(raw_str_xml)
-            out.add(temp_doc.id)
+            if temp_doc.id_date is not None:
+                out.add(temp_doc.id_date)
             out |= set(temp_doc.citations)
 
         return out
@@ -270,11 +315,14 @@ class FileSystem(LoaderBase):
             doc = XMLDoc(await file.read())
         return doc
 
-    async def get_doc(self, id: str) -> XMLDoc:
+    async def get_doc(self, id_date: str) -> XMLDoc | None:
         for file_path in self.init_path.iterdir():
-            if id in str(file_path):
+            if file_path.is_dir():
+                file_path = next(iter(file_path.iterdir()))
+            if id_date in str(file_path):
                 return await self._open_file(file_path)
-        raise FileNotFoundError
+        logger.error(id_date + " document not found")
+        return None
 
     async def get_random_doc(self) -> XMLDoc:
         list_of_files = list(self.init_path.iterdir())
