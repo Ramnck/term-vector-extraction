@@ -99,7 +99,22 @@ class FipsAPI(LoaderBase):
             ) as res:
                 return await res.json()
 
-    async def get_doc(self, id_date: str) -> FipsDoc | None:
+    async def get_doc(self, id: str) -> FipsDoc | None:
+        num_of_doc = re.findall(r"\d+", id)[0]
+
+        res = await self._search_query(q=f"PN={num_of_doc}")
+        res = res["hits"]
+
+        langs = {hit["snippet"]["lang"]: hit for hit in res}
+        res = langs.get("ru", None)
+        if res is None:
+            res = langs.get("en", None)
+
+        if res is not None:
+            res = await self.get_doc_by_id_date(res["id"])
+        return res
+
+    async def get_doc_by_id_date(self, id_date: str) -> FipsDoc | None:
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 self.api_url + "docs/" + id_date, headers=self._headers
@@ -113,7 +128,7 @@ class FipsAPI(LoaderBase):
     async def get_random_doc(self) -> FipsDoc:
         res = await self._search_query(q=random.choice(rand_terms), limit=20)
         doc = random.choice(res["hits"])
-        return await self.get_doc(doc["id"])
+        return await self.get_doc_by_id_date(doc["id"])
 
     async def find_relevant_by_keywords(
         self, kws: list, num_of_docs=20, offset=0
@@ -147,19 +162,14 @@ class XMLDoc(DocumentBase):
                 continue
 
             id = re.sub(r"[^0-9a-zA-Zа-яА-Я]", "", id_date[0])
-            date = id_date[1:]
+            date = " ".join(id_date[1:])
 
-            if len(date) == 1:
-                date = date[0]
-                if date[2] in "1234567890":  # YYYY/MM/DD
-                    date = "".join(re.findall(r"\d+", date))
-                else:  # DD/MM/YYYY
-                    date = "".join(date.split(date[2])[::-1])
-            else:
-                if len(date[0]) > 2:  # YYYY,MM,DD
-                    date = "".join(date)
-                else:  # DD,MM,YYYY
-                    date = "".join(date[::-1])
+            dates = re.findall(r"\d+", date)
+
+            if len(dates[2]) == 4:
+                dates = dates[::-1]
+
+            date = "".join(dates)
 
             out.append(id + "_" + date)
         return out
