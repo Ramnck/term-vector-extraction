@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "keyword extraction"
+version = "0.1.0"
+description = ""
+authors = ["Ramnck <r.karet@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+aiohttp = "^3.10.3"
+keybert = "^0.8.5"
+yake = {git = "https://github.com/LIAAD/yake"}
+pymorphy3 = "^2.0.2"
+nltk = "^3.8.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
