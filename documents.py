@@ -326,10 +326,11 @@ class FileSystem(LoaderBase):
         return doc
 
     async def get_doc(self, id_date: str) -> XMLDoc | None:
+        num_of_doc = re.findall(r"\d+", id_date)[0]
         for file_path in self.init_path.iterdir():
             if file_path.is_dir():
                 file_path = next(iter(file_path.iterdir()))
-            if id_date in str(file_path):
+            if num_of_doc in str(file_path):
                 return await self._open_file(file_path)
         logger.error(id_date + " document not found")
         return None
