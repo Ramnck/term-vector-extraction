@@ -4,13 +4,14 @@ import re
 
 from typing import Callable
 from api import DocumentBase
+from itertools import cycle, chain
+
 
 morph = MorphAnalyzer()
 
 
-# def clean_ru_text(text) -> str:
-# patterns = "[!#$%&'()*+,./:;<=>?@[\]^_`{|}~—\"\-«»–]+"
-# return re.sub(patterns, " ", text)
+def extract_number(text: str) -> str:
+    return re.findall(r"\d+", text)[0]
 
 
 def clean_ru_text(text) -> str:
@@ -33,11 +34,7 @@ stopwords_nltk_en = list(nltk.corpus.stopwords.words("english"))
 
 stopwords_ru = set()
 stopwords_ru |= set(stopwords_nltk_en)
-for word in stopwords_my:
-    stopwords_ru.add(lemmatize_ru_word(word))
-for word in stopwords_nltk_ru:
-    stopwords_ru.add(lemmatize_ru_word(word))
-for word in stopwords_iteco:
+for word in chain(stopwords_my, stopwords_nltk_ru, stopwords_iteco):
     stopwords_ru.add(lemmatize_ru_word(word))
 stopwords_ru = list(stopwords_ru)
 
@@ -73,3 +70,22 @@ def replace_words_with_custom_function(
     result = re.sub(cyrillic_pattern, apply_custom_function, text)
 
     return result
+
+
+def make_extended_term_vec(
+    list_of_vecs: list[list[str]], base_vec: list[str] = [], length: int = 100
+) -> list[str]:
+    vec = set(base_vec)
+
+    iterator = cycle([cycle(i) for i in list_of_vecs if i])
+
+    timeout = 0
+    timeout_val = sum(map(len, list_of_vecs))
+
+    while len(vec) < length:
+        vec.add(lemmatize_ru_word(next(next(iterator))))
+        timeout += 1
+        if timeout > timeout_val:
+            break
+
+    return list(vec)

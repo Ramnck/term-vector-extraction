@@ -9,8 +9,11 @@ import logging
 from enum import StrEnum
 
 from pathlib import Path
+from itertools import compress
+
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 rand_terms = "ракета машина смазка установка самолет вертолёт автомат мотоцикл насос инструмент лист дерево обработка рост эволюция".split()
 
 
@@ -24,46 +27,46 @@ class FipsDoc(DocumentBase):
 
     @property
     def description(self) -> str:
-        json_description = self.raw_json.get("description", {})
-        json_description = json_description.get("ru", None)
-        if json_description is None:
-            json_description = json_description.get("en", None)
+        json_block = self.raw_json.get("description", {})
+        json_text = json_block.get("ru", None)
+        if json_text is None:
+            json_text = json_block.get("en", None)
 
-        if json_description:
-            xml = ET.fromstring(json_description)
+        if json_text:
+            xml = ET.fromstring(json_text)
             return " ".join(i.text for i in xml if i.text is not None)
         else:
             return ""
 
     @property
     def abstract(self) -> str:
-        json_abstract = self.raw_json.get("abstract", {})
-        json_abstract = json_abstract.get("ru", None)
-        if json_abstract is None:
-            json_abstract = json_abstract.get("en", None)
+        json_block = self.raw_json.get("abstract", {})
+        json_text = json_block.get("ru", None)
+        if json_text is None:
+            json_text = json_block.get("en", None)
 
-        if json_abstract:
-            xml = ET.fromstring(json_abstract)
+        if json_text:
+            xml = ET.fromstring(json_text)
             return " ".join(i.text for i in xml if i.text is not None)
         else:
             return ""
 
     @property
     def claims(self) -> str:
-        json_claims = self.raw_json.get("claims", {})
-        json_claims = json_claims.get("ru", None)
-        if json_claims is None:
-            json_claims = json_claims.get("en", None)
+        json_block = self.raw_json.get("claims", {})
+        json_text = json_block.get("ru", None)
+        if json_text is None:
+            json_text = json_block.get("en", None)
 
-        if json_claims:
-            xml = ET.fromstring(json_claims)
+        if json_text:
+            xml = ET.fromstring(json_text)
             out = []
             for i in xml:
                 if i.text is not None:
                     out.append(i.text)
                 for j in i:
                     if j.text is not None:
-                        out.append(j.text) + " "
+                        out.append(j.text)
             return " ".join(out)
         else:
             return ""
@@ -112,7 +115,7 @@ class FipsAPI(LoaderBase):
                     return {}
 
     async def get_doc(self, id: str) -> FipsDoc | None:
-        num_of_doc = re.findall(r"\d+", id)[0]
+        num_of_doc = re.findall(r"\d+", id)[0].lstrip("0")
 
         res = await self._search_query(q=f"PN={num_of_doc}")
         res = res.get("hits", [])
@@ -144,10 +147,10 @@ class FipsAPI(LoaderBase):
         return await self.get_doc_by_id_date(doc.get("id", "no_id"))
 
     async def find_relevant_by_keywords(
-        self, kws: list, num_of_docs=20, offset=0
+        self, kws: list[str], num_of_docs=20, offset=0
     ) -> list[str]:
         res = await self._search_query(
-            q=" OR ".join(kws), offset=offset, limit=num_of_docs
+            q=" OR ".join(compress(kws, kws)), offset=offset, limit=num_of_docs
         )
         docs = [
             re.sub(r"[^0-9a-zA-Zа-яА-Я_]", "", i["id"]) for i in res.get("hits", [])
@@ -339,7 +342,7 @@ class FileSystem(LoaderBase):
         return doc
 
     async def get_doc(self, id_date: str) -> XMLDoc | None:
-        num_of_doc = re.findall(r"\d+", id_date)[0]
+        num_of_doc = re.findall(r"\d+", id_date)[0].lstrip("0")
         for file_path in self.init_path.iterdir():
             if file_path.is_dir():
                 file_path = next(iter(file_path.iterdir()))

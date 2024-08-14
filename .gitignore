@@ -4,3 +4,4 @@ test.*
 __.ipynb
 main copy*
 .env
+log.txt

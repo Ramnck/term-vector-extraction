@@ -11,7 +11,13 @@ from extractors import (
     KeyBERTModel,
     RuLongrormerEmbedder,
 )
-from lexis import clean_ru_text, lemmatize_ru_word
+from lexis import (
+    clean_ru_text,
+    lemmatize_ru_word,
+    make_extended_term_vec,
+    extract_number,
+)
+from api import DocumentBase
 
 import logging
 import asyncio
@@ -22,7 +28,7 @@ import numpy as np
 
 from sentence_transformers import SentenceTransformer
 from itertools import cycle
-
+from tqdm.asyncio import tqdm_asyncio
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,8 +37,31 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
 BASE_DATA_PATH = Path("\\prog\\py\\fips\\kwe\\data")
 FIPS_API_KEY = os.getenv("FIPS_API_KEY")
+
+if FIPS_API_KEY is None:
+    logger.error("Не указан API ключ")
+    exit(1)
+
+api = FipsAPI(FIPS_API_KEY)
+loader = FileSystem("data\\raw\\clusters")
+
+extractors = [
+    YAKExtractor(),
+    KeyBERTExtractor(
+        SentenceTransformer(
+            "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+        ),
+        "multilingual-mpnet",
+    ),
+    KeyBERTExtractor(
+        SentenceTransformer("intfloat/multilingual-e5-large"),
+        "e5-large",
+        text_extraction_func=lambda doc: "query: " + clean_ru_text(doc.text),
+    ),
+]
 
 
 def find_last_file(base_name_of_file: Path):
@@ -42,91 +71,79 @@ def find_last_file(base_name_of_file: Path):
     return name_of_file
 
 
+async def extract_keywords(
+    doc: DocumentBase, performance: dict | None = None
+) -> dict[str, list[list[str]]]:
+    kws = {}
+
+    sub_docs = []
+    async with asyncio.TaskGroup() as tg:
+        for sub_doc_id_date in doc.cluster:
+            sub_docs.append(tg.create_task(api.get_doc(sub_doc_id_date)))
+    sub_docs = [i.result() for i in sub_docs if i.result() is not None]
+    logger.debug(f"total {len(sub_docs)} sub_docs")
+
+    for ex in extractors:
+        name = ex.get_name()
+        try:
+            # if 1:
+            t = time.time()
+
+            tmp_kws = []
+
+            for sub_doc in sub_docs:
+                if sub_doc is not None:
+                    tmp_kws.append(ex.get_keywords(sub_doc))
+            base_kws = ex.get_keywords(doc)
+            tmp_kws.insert(0, base_kws)
+
+            kws[name] = tmp_kws
+
+            if performance is not None:
+                performance[name]["time"].append(time.time() - t)
+                performance[name]["document_len"].append(len(doc.text))
+
+        except Exception as eee:
+            logger.error(f"Exception in extractor for: {eee}")
+
+    return kws
+
+
+async def get_relevant(keywords: dict[str, list[str]]) -> dict[str, list[str]]:
+    relevant = {}
+
+    async with asyncio.TaskGroup() as tg:
+        for extractor_name, kw in keywords.items():
+            relevant[extractor_name] = tg.create_task(
+                api.find_relevant_by_keywords(kw, num_of_docs=30)
+            )
+
+    relevant = {k: v.result() for k, v in relevant.items()}
+
+    return relevant
+
+
 async def main(num_of_docs: int | None = None, name_of_experiment: str = "KWE"):
-    api = FipsAPI(FIPS_API_KEY)
-    loader = FileSystem("data\\raw\\clusters")
-
-    extractors = [
-        YAKExtractor(),
-        KeyBERTExtractor(
-            SentenceTransformer(
-                "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
-            ),
-            "multilingual-mpnet",
-        ),
-        KeyBERTExtractor(
-            SentenceTransformer("intfloat/multilingual-e5-large"),
-            "e5-large",
-            text_extraction_func=lambda doc: "query: " + clean_ru_text(doc.text),
-        ),
-    ]
-
     logger.info("Начало обработки")
 
-    performance = {i.get_name(): {"document": [], "time": []} for i in extractors}
-    last_indicated_percent = -99999
-    num_of_doc = 0
+    performance = {i.get_name(): {"document_len": [], "time": []} for i in extractors}
 
-    async for doc in loader:
+    async for num_of_doc, doc in enumerate(
+        tqdm_asyncio(aiter(loader), total=num_of_docs, desc="Progress")
+    ):
         if num_of_doc >= num_of_docs:
             break
 
-        kws = {}
-        relevant = {}
-
-        sub_docs = []
-        async with asyncio.TaskGroup() as tg:
-            for sub_doc_id_date in doc.cluster:
-                # sub_doc_id, sub_doc_date = sub_doc_id_date.split("_")
-                sub_docs.append(tg.create_task(api.get_doc(sub_doc_id_date)))
-        sub_docs = [i.result() for i in sub_docs if i.result() is not None]
-        logger.info(f"total {len(sub_docs)} sub_docs")
-
-        for ex in extractors:
-            name = ex.get_name()
-            try:
-                t = time.time()
-
-                tmp_kws = []
-
-                for sub_doc in sub_docs:
-                    if sub_doc is not None:
-                        tmp_kws.append(ex.get_keywords(sub_doc, use_mmr=True))
-                tmp_kws.append(ex.get_keywords(doc, use_mmr=True))
-
-                kw = set()
-                iterator = cycle([cycle(i) for i in tmp_kws if i])
-
-                try:
-                    async with asyncio.timeout(
-                        0.2
-                    ):  # таймаут чтоб не уйти в бесконечный while
-                        while len(kw) < 100:
-                            kw.add(lemmatize_ru_word(next(next(iterator))))
-                            await asyncio.sleep(0)
-                except TimeoutError as ex:
-                    pass
-
-                kw = list(kw)
-
-                kws[name] = kw
-
-                performance[name]["time"].append(time.time() - t)
-                performance[name]["document"].append(doc.id_date)
-
-            except Exception as eee:
-                logger.error(f"Exception in extractor for: {eee}")
-
-        async with asyncio.TaskGroup() as tg:
-            for extractor_name, kw in kws.items():
-                relevant[extractor_name] = tg.create_task(
-                    api.find_relevant_by_keywords(kw, num_of_docs=30)
-                )
-        relevant = {k: v.result() for k, v in relevant.items()}
-
         data = {"56": doc.citations, "cluster": list(doc.cluster)}
 
-        data["keywords"] = kws
+        keywords = await extract_keywords(doc, performance=performance)
+
+        for extractor_name in keywords.keys():
+            keywords[extractor_name] = make_extended_term_vec(keywords[extractor_name])
+        data["keywords"] = keywords
+
+        relevant = await get_relevant(keywords)
+
         data["relevant"] = relevant
 
         with open(
@@ -135,11 +152,6 @@ async def main(num_of_docs: int | None = None, name_of_experiment: str = "KWE"):
             encoding="utf-8",
         ) as file:
             json.dump(data, file, indent=4, ensure_ascii=False)
-
-        num_of_doc += 1
-        if num_of_doc * 100 // num_of_docs >= last_indicated_percent:
-            last_indicated_percent = num_of_doc * 100 // num_of_docs
-            logger.info(f"{last_indicated_percent} % done ({num_of_doc} docs)")
 
     logger.info("Средняя скорость работы алгоритмов:")
     for extractor_name, value in performance.items():
@@ -156,5 +168,5 @@ async def main(num_of_docs: int | None = None, name_of_experiment: str = "KWE"):
 if __name__ == "__main__":
     # import profile
     # profile.run('main(1)')
-    coro = main(80, "ex_from_cluster")
+    coro = main(2, "term_vectors")
     asyncio.run(coro)

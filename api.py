@@ -36,7 +36,7 @@ class KeyWordExtractorBase(ABC):
     def __init__(self) -> None:
         raise NotImplementedError
 
-    def get_keywords(self, doc: DocumentBase, **kwargs) -> list:
+    def get_keywords(self, doc: DocumentBase, **kwargs) -> list[str]:
         raise NotImplementedError
 
     def get_name(self) -> str:
@@ -54,7 +54,7 @@ class LoaderBase(ABC):
     async def get_random_doc(self) -> DocumentBase:
         raise NotImplementedError
 
-    async def find_relevant_by_keywords(self, kws) -> list:
+    async def find_relevant_by_keywords(self, kws) -> list[str]:
         raise NotImplementedError
 
 

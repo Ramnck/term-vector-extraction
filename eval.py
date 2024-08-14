@@ -2,9 +2,10 @@ from documents import FileSystem
 import asyncio
 from pathlib import Path
 import json
+from lexis import extract_number
 
 
-async def main(name_of_file: str | Path):
+async def eval(name_of_file_to_save: str | Path, name_of_dir_to_read: str | Path):
     base_path = Path("data") / "eval"
 
     eval_dict = {
@@ -16,38 +17,39 @@ async def main(name_of_file: str | Path):
         "no_relevant": 0,
     }
 
-    with open(base_path / "names_of_methods.json", encoding="utf-8") as file:
-        methods = json.load(file)
+    with open(base_path / "performance.json", encoding="utf-8") as file:
+        methods = list(json.load(file).keys())
 
     metrics = {method: eval_dict.copy() for method in methods}
 
-    list_of_files = list((base_path / "kwe").iterdir())
+    list_of_files = list((base_path / name_of_dir_to_read).iterdir())
 
     for file_path in list_of_files:
         with open(file_path, encoding="utf-8") as file:
             data = json.load(file)
 
-        doc_without_56 = []
+        citations = list(map(extract_number, data["56"]))
+        cluster = list(map(extract_number, data["cluster"]))
 
-        citations = data["56"]
-
-        if len(citations) == 0:
-            doc_without_56.append(file_path.stem)
+        evaluate_data = set(citations)
+        # evaluate_data = set(citations + cluster)
 
         for extractor_name, relevant in data["relevant"].items():
             if extractor_name not in metrics.keys():
                 continue
 
-            if len(citations) > 0:
+            relevant = list(set(map(extract_number, relevant)))[:20]
+
+            if len(evaluate_data) > 0:
                 num_of_hits = 0
-                for cite in citations:
-                    if cite in relevant:
+                for doc in evaluate_data:
+                    if doc in relevant:
                         num_of_hits += 1
 
                 metrics[extractor_name]["soft"] += num_of_hits > 0
-                if len(citations) > 1:
-                    metrics[extractor_name]["avg"] += num_of_hits / len(citations)
-                    metrics[extractor_name]["hard"] += num_of_hits == len(citations)
+                if len(evaluate_data) > 1:
+                    metrics[extractor_name]["avg"] += num_of_hits / len(evaluate_data)
+                    metrics[extractor_name]["hard"] += num_of_hits == len(evaluate_data)
                 metrics[extractor_name]["all_docs"] += 1
 
             if relevant:
@@ -66,12 +68,10 @@ async def main(name_of_file: str | Path):
             print(metric, "-", round(eval[metric], 4))
         print()
 
-    if doc_without_56:
-        print("Документы без 56 поля:", doc_without_56)
-
-    with open(base_path / name_of_file, "w+") as file:
+    with open(base_path / name_of_file_to_save, "w+") as file:
         json.dump(metrics, file, ensure_ascii=False, indent=4)
 
 
 if __name__ == "__main__":
-    asyncio.run(main("eval.json"))
+    coro = eval("eval.json", "ex_from_cluster")
+    asyncio.run(coro)
