@@ -9,7 +9,7 @@ morph = MorphAnalyzer()
 
 
 # def clean_ru_text(text) -> str:
-# patterns = "[A-Za-z0-9!#$%&'()*+,./:;<=>?@[\]^_`{|}~—\"\-«»–]+"
+# patterns = "[!#$%&'()*+,./:;<=>?@[\]^_`{|}~—\"\-«»–]+"
 # return re.sub(patterns, " ", text)
 
 
@@ -42,21 +42,21 @@ for word in stopwords_iteco:
 stopwords_ru = list(stopwords_ru)
 
 
-def lemmatize_doc(doc: str | list[str], stopwords: list[str]) -> str:
+def lemmatize_doc(
+    doc: str | list[str], stopwords: list[str] = stopwords_ru
+) -> list[str]:
     tokens = []
 
     if isinstance(doc, str):
         doc = doc.split()
 
     for token in doc:
-        token = token.strip()
+        token = "".join(re.findall(r"[А-Яа-яA-Za-z0-9]+", token))
         if token:
             token = lemmatize_ru_word(token)
             if token not in stopwords:
                 tokens.append(token)
-    if len(tokens) > 2:
-        return " ".join(tokens)
-    return None
+    return tokens
 
 
 def replace_words_with_custom_function(

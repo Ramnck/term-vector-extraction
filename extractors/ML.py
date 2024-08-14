@@ -96,7 +96,7 @@ class KeyBERTModel:
 
         lemmatized_text = lemmatize_doc(document, stopwords_ru)
 
-        words = [word for word in set(lemmatized_text.split()) if word]
+        words = [word for word in set(lemmatized_text) if word]
 
         word_embeddings = self.extract_word_embeddings(words)
         doc_embedding = self.extract_doc_embedding(document)
