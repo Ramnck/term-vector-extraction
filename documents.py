@@ -23,13 +23,12 @@ class FipsDoc(DocumentBase):
         return [i["identity"] for i in self.raw_json["common"]["citated_docs"]]
 
     @property
-    def xml(self):
-        tree = ET.fromstring(self.raw_json["description"]["ru"])
-        return tree
-
-    @property
     def description(self) -> str:
-        json_description = self.raw_json.get("description", {}).get("ru", "")
+        json_description = self.raw_json.get("description", {})
+        json_description = json_description.get("ru", None)
+        if json_description is None:
+            json_description = json_description.get("en", None)
+
         if json_description:
             xml = ET.fromstring(json_description)
             return " ".join(i.text for i in xml if i.text is not None)
@@ -38,7 +37,11 @@ class FipsDoc(DocumentBase):
 
     @property
     def abstract(self) -> str:
-        json_abstract = self.raw_json.get("abstract", {}).get("ru", "")
+        json_abstract = self.raw_json.get("abstract", {})
+        json_abstract = json_abstract.get("ru", None)
+        if json_abstract is None:
+            json_abstract = json_abstract.get("en", None)
+
         if json_abstract:
             xml = ET.fromstring(json_abstract)
             return " ".join(i.text for i in xml if i.text is not None)
@@ -47,17 +50,21 @@ class FipsDoc(DocumentBase):
 
     @property
     def claims(self) -> str:
-        json_claims = self.raw_json.get("claims", {}).get("ru", "")
+        json_claims = self.raw_json.get("claims", {})
+        json_claims = json_claims.get("ru", None)
+        if json_claims is None:
+            json_claims = json_claims.get("en", None)
+
         if json_claims:
-            xml = ET.fromstring(self.raw_json["claims"]["ru"])
-            out = ""
+            xml = ET.fromstring(json_claims)
+            out = []
             for i in xml:
                 if i.text is not None:
-                    out += i.text + " "
+                    out.append(i.text)
                 for j in i:
                     if j.text is not None:
-                        out += j.text + " "
-            return out
+                        out.append(j.text) + " "
+            return " ".join(out)
         else:
             return ""
 
@@ -97,13 +104,18 @@ class FipsAPI(LoaderBase):
                 data=data.encode("utf-8"),
                 headers=self._headers,
             ) as res:
-                return await res.json()
+                try:
+                    return await res.json()
+                except aiohttp.ContentTypeError as ex:
+                    logger.error(str(kwargs) + " document not found")
+                    logger.debug(res.text)
+                    return {}
 
     async def get_doc(self, id: str) -> FipsDoc | None:
         num_of_doc = re.findall(r"\d+", id)[0]
 
         res = await self._search_query(q=f"PN={num_of_doc}")
-        res = res["hits"]
+        res = res.get("hits", [])
 
         langs = {hit["snippet"]["lang"]: hit for hit in res}
         res = langs.get("ru", None)
@@ -123,12 +135,13 @@ class FipsAPI(LoaderBase):
                     return FipsDoc(await res.json())
                 except aiohttp.ContentTypeError as ex:
                     logger.error(id_date + " document not found")
+                    logger.debug(res.text)
                     return None
 
     async def get_random_doc(self) -> FipsDoc:
         res = await self._search_query(q=random.choice(rand_terms), limit=20)
-        doc = random.choice(res["hits"])
-        return await self.get_doc_by_id_date(doc["id"])
+        doc = random.choice(res.get("hits", []))
+        return await self.get_doc_by_id_date(doc.get("id", "no_id"))
 
     async def find_relevant_by_keywords(
         self, kws: list, num_of_docs=20, offset=0
