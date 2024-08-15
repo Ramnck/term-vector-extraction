@@ -28,6 +28,7 @@ from pathlib import Path
 import json
 import numpy as np
 import aiofiles
+import sys
 
 from itertools import cycle, chain
 from tqdm.asyncio import tqdm_asyncio
@@ -36,6 +37,9 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
     datefmt="%H:%M:%S",
+    filename="log.txt",
+    filemode="w+",
+    encoding="utf-8",
 )
 logger = logging.getLogger(__name__)
 
@@ -73,38 +77,49 @@ def find_last_file(base_name_of_file: Path):
     return name_of_file
 
 
-async def extract_keywords_from_cluster(
-    doc: DocumentBase,
-    api: LoaderBase,
-    extractors: list[KeyWordExtractorBase],
-    performance: dict | None = None,
-) -> dict[str, list[list[str]]]:
-    kws = {}
-
+async def get_cluster_from_document(
+    doc: DocumentBase, api: LoaderBase
+) -> list[DocumentBase]:
     sub_docs = []
     async with asyncio.TaskGroup() as tg:
         for sub_doc_id_date in doc.cluster:
             sub_docs.append(tg.create_task(api.get_doc(sub_doc_id_date)))
     sub_docs = [i.result() for i in sub_docs if i.result() is not None]
-    logger.debug(f"total {len(sub_docs)} sub_docs")
+    sub_docs = set(sub_docs) - set([doc])
+    sub_docs = [doc] + list(sub_docs)
+
+    logger.debug(f"Total {len(sub_docs)} documents")
+
+    return sub_docs
+
+
+async def extract_keywords_from_docs(
+    docs: DocumentBase | list[DocumentBase],
+    extractors: list[KeyWordExtractorBase],
+    performance: dict | None = None,
+) -> dict[str, list[list[str]]]:
+    kws = {}
+
+    if isinstance(docs, DocumentBase):
+        docs = [docs]
 
     for ex in extractors:
         name = ex.get_name()
         try:
-            t = time.time()
 
             tmp_kws = []
 
-            tmp_kws.append(ex.get_keywords(doc))
-            for sub_doc in sub_docs:
-                if sub_doc is not None:
-                    tmp_kws.append(ex.get_keywords(sub_doc))
+            for doc in docs:
+                if doc is not None:
+                    t = time.time()
+                    kw = ex.get_keywords(doc)
+                    if kw:
+                        tmp_kws.append(kw)
+                        if performance is not None:
+                            performance[name]["time"].append(time.time() - t)
+                            performance[name]["document_len"].append(len(doc.text))
 
             kws[name] = tmp_kws
-
-            if performance is not None:
-                performance[name]["time"].append(time.time() - t)
-                performance[name]["document_len"].append(len(doc.text))
 
         except Exception as eee:
             logger.error(f"Exception in extractor for: {eee}")
@@ -198,8 +213,10 @@ async def main(num_of_docs: int | None = None, name_of_experiment: str = "KWE"):
 
         data = {"56": doc.citations, "cluster": list(doc.cluster)}
 
-        keywords = await extract_keywords_from_cluster(
-            doc, api, extractors, performance=performance
+        cluster = await get_cluster_from_document(doc, api)
+
+        keywords = await extract_keywords_from_docs(
+            cluster, extractors, performance=performance
         )
         # for extractor_name in keywords.keys():
         # keywords[extractor_name] = make_extended_term_vec(keywords[extractor_name])
@@ -245,5 +262,10 @@ async def main(num_of_docs: int | None = None, name_of_experiment: str = "KWE"):
 if __name__ == "__main__":
     # import profile
     # profile.run('main(1)')
-    coro = main(2, "term_vectors_rel")
+    duplicate_log_to_stdout = True
+
+    if duplicate_log_to_stdout:
+        logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
+
+    coro = main(80, "term_vectors_rel")
     asyncio.run(coro)
