@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "keyword extraction"
+name = "term vector extraction"
 version = "0.1.0"
 description = ""
 authors = ["Ramnck <r.karet@gmail.com>"]

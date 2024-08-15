@@ -33,14 +33,14 @@ from itertools import cycle, chain
 from tqdm.asyncio import tqdm_asyncio
 
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
     datefmt="%H:%M:%S",
 )
 logger = logging.getLogger(__name__)
 
 
-BASE_DATA_PATH = Path("\\prog\\py\\fips\\kwe\\data")
+BASE_DATA_PATH = Path("data")
 FIPS_API_KEY = os.getenv("FIPS_API_KEY")
 
 if FIPS_API_KEY is None:
