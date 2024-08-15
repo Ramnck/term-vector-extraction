@@ -5,6 +5,8 @@ load_dotenv()
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
 from documents import FipsAPI, FileSystem
+
+from sentence_transformers import SentenceTransformer
 from extractors import (
     YAKExtractor,
     KeyBERTExtractor,
@@ -17,7 +19,7 @@ from lexis import (
     make_extended_term_vec,
     extract_number,
 )
-from api import DocumentBase
+from api import DocumentBase, LoaderBase
 
 import logging
 import asyncio
@@ -25,9 +27,9 @@ import time
 from pathlib import Path
 import json
 import numpy as np
+import aiofiles
 
-from sentence_transformers import SentenceTransformer
-from itertools import cycle
+from itertools import cycle, chain
 from tqdm.asyncio import tqdm_asyncio
 
 logging.basicConfig(
@@ -71,8 +73,10 @@ def find_last_file(base_name_of_file: Path):
     return name_of_file
 
 
-async def extract_keywords(
-    doc: DocumentBase, performance: dict | None = None
+async def extract_keywords_from_cluster(
+    doc: DocumentBase,
+    api: LoaderBase,
+    performance: dict | None = None,
 ) -> dict[str, list[list[str]]]:
     kws = {}
 
@@ -86,7 +90,6 @@ async def extract_keywords(
     for ex in extractors:
         name = ex.get_name()
         try:
-            # if 1:
             t = time.time()
 
             tmp_kws = []
@@ -109,7 +112,9 @@ async def extract_keywords(
     return kws
 
 
-async def get_relevant(keywords: dict[str, list[str]]) -> dict[str, list[str]]:
+async def get_relevant(
+    keywords: dict[str, list[str]], api: LoaderBase
+) -> dict[str, list[str]]:
     relevant = {}
 
     async with asyncio.TaskGroup() as tg:
@@ -123,35 +128,108 @@ async def get_relevant(keywords: dict[str, list[str]]) -> dict[str, list[str]]:
     return relevant
 
 
+async def save_data_to_json(
+    obj: dict | list, path_of_file: Path
+) -> bool:  # False on success
+    try:
+        async with aiofiles.open(
+            path_of_file,
+            "w+",
+            encoding="utf-8",
+        ) as file:
+            await file.write(json.dumps(obj, ensure_ascii=False, indent=4))
+        return False
+    except FileNotFoundError:
+        return True
+
+
+async def load_data_from_json(path_of_file: Path) -> dict | None:
+    try:
+        async with aiofiles.open(
+            path_of_file,
+            "r",
+            encoding="utf-8",
+        ) as file:
+            data = json.loads(await file.read())
+        return data
+    except FileNotFoundError:
+        return None
+
+
+async def test_different_vectors(
+    data_keywords: dict[str, list[list[str]]],
+    methods: list[str],
+    lens_of_vec: list[int],
+    api: LoaderBase,
+) -> dict[str, list[str]]:
+
+    relevant = {}
+    async with asyncio.TaskGroup() as tg:
+        for method in methods:
+            for len_of_vec in lens_of_vec:
+                for extractor_name, term_vec_vec in data_keywords.items():
+                    name = extractor_name + "_" + method + "_" + str(len_of_vec)
+                    if method == "expand":
+                        term_vec = make_extended_term_vec(
+                            term_vec_vec[1:],
+                            base_vec=term_vec_vec[0],
+                            length=len_of_vec,
+                        )
+                    elif method == "mix":
+                        term_vec = make_extended_term_vec(
+                            term_vec_vec, length=len_of_vec
+                        )
+
+                    relevant[name] = tg.create_task(
+                        api.find_relevant_by_keywords(term_vec, 30)
+                    )
+    relevant = {k: v.result() for k, v in relevant.items()}
+
+    return relevant
+
+
 async def main(num_of_docs: int | None = None, name_of_experiment: str = "KWE"):
     logger.info("Начало обработки")
 
     performance = {i.get_name(): {"document_len": [], "time": []} for i in extractors}
 
-    async for num_of_doc, doc in enumerate(
-        tqdm_asyncio(aiter(loader), total=num_of_docs, desc="Progress")
-    ):
-        if num_of_doc >= num_of_docs:
-            break
+    num_of_doc = 0
+    async for doc in tqdm_asyncio(aiter(loader), total=num_of_docs, desc="Progress"):
 
         data = {"56": doc.citations, "cluster": list(doc.cluster)}
 
-        keywords = await extract_keywords(doc, performance=performance)
-
-        for extractor_name in keywords.keys():
-            keywords[extractor_name] = make_extended_term_vec(keywords[extractor_name])
+        keywords = await extract_keywords_from_cluster(
+            doc, api, performance=performance
+        )
+        # for extractor_name in keywords.keys():
+        # keywords[extractor_name] = make_extended_term_vec(keywords[extractor_name])
         data["keywords"] = keywords
 
-        relevant = await get_relevant(keywords)
+        # relevant = await get_relevant(keywords, api)
 
-        data["relevant"] = relevant
+        # path_of_file = (
+        #     BASE_DATA_PATH / "eval" / name_of_experiment / (doc.id_date + ".json")
+        # )
+        # data = await load_data_from_json(path_of_file)
+        # if not data:
+        #     logger.error("File %s not found" % path_of_file.name)
+        #     continue
 
-        with open(
-            BASE_DATA_PATH / "eval" / name_of_experiment / (doc.id_date + ".json"),
-            "w+",
-            encoding="utf-8",
-        ) as file:
-            json.dump(data, file, indent=4, ensure_ascii=False)
+        # relevant = await test_different_vectors(
+        #     data["keywords"], ["expand", "mix"], [100, 125, 150, 175, 200], api
+        # )
+
+        # data["relevant"] = relevant
+
+        path_of_file = (
+            BASE_DATA_PATH / "eval" / name_of_experiment / (doc.id_date + ".json")
+        )
+        if await save_data_to_json(data, path_of_file):
+            logger.error("Error occured while saving %s file" % path_of_file.name)
+
+        num_of_doc += 1
+        if num_of_doc >= num_of_docs:
+            break
 
     logger.info("Средняя скорость работы алгоритмов:")
     for extractor_name, value in performance.items():
@@ -159,14 +237,13 @@ async def main(num_of_docs: int | None = None, name_of_experiment: str = "KWE"):
         out = f"{extractor_name} : {round(mean_time, 2)} s"
         logger.info(out)
 
-    with open(
-        BASE_DATA_PATH / "eval" / "performance.json", "w+", encoding="utf-8"
-    ) as file:
-        json.dump(performance, file, indent=4, ensure_ascii=False)
+    path_of_file = BASE_DATA_PATH / "eval" / (name_of_experiment + "_performance.json")
+    if await save_data_to_json(performance, path_of_file):
+        logger.error("Error occured while saving %s file" % path_of_file.name)
 
 
 if __name__ == "__main__":
     # import profile
     # profile.run('main(1)')
-    coro = main(2, "term_vectors")
+    coro = main(2, "term_vectors_rel")
     asyncio.run(coro)

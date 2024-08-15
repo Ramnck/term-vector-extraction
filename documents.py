@@ -100,7 +100,7 @@ class FipsAPI(LoaderBase):
 
     async def _search_query(self, **kwargs) -> dict:
         async with aiohttp.ClientSession() as session:
-            data = json.dumps(kwargs)
+            data = json.dumps(kwargs, ensure_ascii=False)
 
             async with session.post(
                 self.api_url + "search",
@@ -110,8 +110,7 @@ class FipsAPI(LoaderBase):
                 try:
                     return await res.json()
                 except aiohttp.ContentTypeError as ex:
-                    logger.error(str(kwargs) + " document not found")
-                    logger.debug(res.text)
+                    logger.debug(await res.text())
                     return {}
 
     async def get_doc(self, id: str) -> FipsDoc | None:
@@ -138,7 +137,7 @@ class FipsAPI(LoaderBase):
                     return FipsDoc(await res.json())
                 except aiohttp.ContentTypeError as ex:
                     logger.error(id_date + " document not found")
-                    logger.debug(res.text)
+                    logger.debug(await res.text())
                     return None
 
     async def get_random_doc(self) -> FipsDoc:
