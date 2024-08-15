@@ -19,7 +19,7 @@ from lexis import (
     make_extended_term_vec,
     extract_number,
 )
-from api import DocumentBase, LoaderBase
+from api import DocumentBase, LoaderBase, KeyWordExtractorBase
 
 import logging
 import asyncio
@@ -33,7 +33,7 @@ from itertools import cycle, chain
 from tqdm.asyncio import tqdm_asyncio
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format="%(asctime)s - %(levelname)s - %(message)s",
     datefmt="%H:%M:%S",
 )
@@ -76,6 +76,7 @@ def find_last_file(base_name_of_file: Path):
 async def extract_keywords_from_cluster(
     doc: DocumentBase,
     api: LoaderBase,
+    extractors: list[KeyWordExtractorBase],
     performance: dict | None = None,
 ) -> dict[str, list[list[str]]]:
     kws = {}
@@ -94,11 +95,10 @@ async def extract_keywords_from_cluster(
 
             tmp_kws = []
 
+            tmp_kws.append(ex.get_keywords(doc))
             for sub_doc in sub_docs:
                 if sub_doc is not None:
                     tmp_kws.append(ex.get_keywords(sub_doc))
-            base_kws = ex.get_keywords(doc)
-            tmp_kws.insert(0, base_kws)
 
             kws[name] = tmp_kws
 
@@ -199,7 +199,7 @@ async def main(num_of_docs: int | None = None, name_of_experiment: str = "KWE"):
         data = {"56": doc.citations, "cluster": list(doc.cluster)}
 
         keywords = await extract_keywords_from_cluster(
-            doc, api, performance=performance
+            doc, api, extractors, performance=performance
         )
         # for extractor_name in keywords.keys():
         # keywords[extractor_name] = make_extended_term_vec(keywords[extractor_name])

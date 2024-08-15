@@ -48,7 +48,7 @@ class LoaderBase(ABC):
         raise NotImplementedError
 
     # Get document by ID
-    async def get_doc(self, id: str) -> DocumentBase:
+    async def get_doc(self, id: str) -> DocumentBase | None:
         raise NotImplementedError
 
     async def get_random_doc(self) -> DocumentBase:
