@@ -52,7 +52,7 @@ if FIPS_API_KEY is None:
     exit(1)
 
 api = FipsAPI(FIPS_API_KEY)
-loader = FileSystem("data\\raw\\clusters")
+loader = FileSystem(Path("data") / "raw" / "clusters")
 
 extractors = [
     YAKExtractor(),
@@ -267,5 +267,5 @@ if __name__ == "__main__":
     if duplicate_log_to_stdout:
         logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 
-    coro = main(80, "term_vectors_rel")
+    coro = main(80, "term_vectors")
     asyncio.run(coro)

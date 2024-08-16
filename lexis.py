@@ -5,7 +5,7 @@ import re
 from typing import Callable
 from api import DocumentBase
 from itertools import cycle, chain
-
+from pathlib import Path
 
 morph = MorphAnalyzer()
 
@@ -25,9 +25,9 @@ def lemmatize_ru_word(word: str) -> str:
     return morph.normal_forms(word)[0]
 
 
-with open("data\\SimilarStopWords.txt", encoding="utf-8") as file:
+with open(Path("data") / "SimilarStopWords.txt", encoding="utf-8") as file:
     stopwords_iteco = [i.strip() for i in file]
-with open("data\\MyStopWords.txt", encoding="utf-8") as file:
+with open(Path("data") / "MyStopWords.txt", encoding="utf-8") as file:
     stopwords_my = [i.strip() for i in file]
 stopwords_nltk_ru = list(nltk.corpus.stopwords.words("russian"))
 stopwords_nltk_en = list(nltk.corpus.stopwords.words("english"))
