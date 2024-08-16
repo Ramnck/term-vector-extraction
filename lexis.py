@@ -80,7 +80,7 @@ def make_extended_term_vec(
     iterator = cycle([cycle(i) for i in list_of_vecs if i])
 
     timeout = 0
-    timeout_val = sum(map(len, list_of_vecs))
+    timeout_val = sum(map(len, list_of_vecs)) * 3
 
     while len(vec) < length:
         vec.add(lemmatize_ru_word(next(next(iterator))))
