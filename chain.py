@@ -1,30 +1,38 @@
-import os
-import logging
-import asyncio
-import time
-from pathlib import Path
 import json
-import numpy as np
-import aiofiles
+import logging
+import os
+import random
+import re
 import sys
+import time
 
+import aiofiles
+import asyncio
+import numpy as np
 from dotenv import load_dotenv
-from api import DocumentBase, LoaderBase, KeyWordExtractorBase
+from pathlib import Path
 
+from api import DocumentBase, KeyWordExtractorBase, LoaderBase
 from lexis import (
     clean_ru_text,
+    extract_number,
     lemmatize_ru_word,
     make_extended_term_vec,
-    extract_number,
 )
 
+name = [Path(sys.argv[0]).name] + sys.argv[1:]
+filename = " ".join(name)
+# filename = "".join(re.findall(r"[A-Za-z0-9 \.\-]", filename))
+
+filepath = Path("data") / "logs" / filename
+filepath = filepath.parent / (filepath.name + ".log.txt")
 
 load_dotenv()
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
     datefmt="%H:%M:%S",
-    filename="log.txt",
+    filename=filepath,
     filemode="w+",
     encoding="utf-8",
 )
@@ -56,11 +64,15 @@ async def get_cluster_from_document(
 
 
 async def extract_keywords_from_docs(
-    docs: DocumentBase | list[DocumentBase],
+    docs: DocumentBase | list[DocumentBase] | None,
     extractors: list[KeyWordExtractorBase],
     performance: dict | None = None,
 ) -> dict[str, list[list[str]]]:
     kws = {}
+
+    if docs is None:
+        logger.error("No docs given to extract_keywords_from_docs")
+        return {i.get_name(): [[""]] for i in extractors}
 
     if isinstance(docs, DocumentBase):
         docs = [docs]
@@ -68,18 +80,19 @@ async def extract_keywords_from_docs(
     for ex in extractors:
         name = ex.get_name()
         try:
-
             tmp_kws = []
 
             for doc in docs:
                 if doc is not None:
                     t = time.time()
                     kw = ex.get_keywords(doc)
-                    if kw:
+                    if len(kw) > 2:
                         tmp_kws.append(kw)
                         if performance is not None:
                             performance[name]["time"].append(time.time() - t)
-                            performance[name]["document_len"].append(len(doc.text))
+                            performance[name]["document_len"].append(
+                                len(doc.text)
+                            )
 
             kws[name] = tmp_kws
 
@@ -141,11 +154,13 @@ async def test_different_vectors(
 ) -> dict[str, list[str]]:
 
     relevant = {}
-    async with asyncio.TaskGroup() as tg:
-        for method in methods:
-            for len_of_vec in lens_of_vec:
-                for extractor_name, term_vec_vec in data_keywords.items():
-                    name = extractor_name + "_" + method + "_" + str(len_of_vec)
+    for len_of_vec in lens_of_vec:
+        for extractor_name, term_vec_vec in data_keywords.items():
+            async with asyncio.TaskGroup() as tg:
+                for method in methods:
+                    name = (
+                        extractor_name + "_" + method + "_" + str(len_of_vec)
+                    )
                     if method == "expand":
                         term_vec = make_extended_term_vec(
                             term_vec_vec[1:],
@@ -156,6 +171,14 @@ async def test_different_vectors(
                         term_vec = make_extended_term_vec(
                             term_vec_vec, length=len_of_vec
                         )
+                    elif method == "shuffle":
+                        for i in term_vec_vec:
+                            random.shuffle(i)
+                        term_vec = make_extended_term_vec(
+                            term_vec_vec, length=len_of_vec
+                        )
+                    elif method == "raw":
+                        term_vec = term_vec_vec[0]
 
                     relevant[name] = tg.create_task(
                         api.find_relevant_by_keywords(term_vec, 30)

@@ -89,18 +89,16 @@ async def main(
         )
 
         if not keywords["YAKE"][0][0]:
-            logger.info("Doc %d has empty kws" % doc.id)
-            logger.info(" ".join(map(lambda x: x.id_date, cluster)))
+            logger.error("Doc %d has empty kws" % doc.id)
+            logger.error(" ".join(map(lambda x: x.id_date, cluster)))
 
-        for extractor_name in keywords.keys():
-            keywords[extractor_name] = make_extended_term_vec(
-                keywords[extractor_name]
-            )
+        # for extractor_name in keywords.keys():
+        #     keywords[extractor_name] = make_extended_term_vec(keywords[extractor_name])
         data["keywords"] = keywords
 
-        relevant = await get_relevant(keywords, api)
+        # relevant = await get_relevant(keywords, api)
 
-        data["relevant"] = relevant
+        # data["relevant"] = relevant
 
         path_of_file = (
             BASE_DATA_PATH

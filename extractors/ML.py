@@ -1,17 +1,15 @@
-from api import KeyWordExtractorBase, DocumentBase, EmbedderBase
-from lexis import clean_ru_text, lemmatize_doc, stopwords_ru
-
-from keybert import KeyBERT
-
-import torch
 import numpy as np
-
-from sklearn.feature_extraction.text import CountVectorizer
-from transformers import LongformerModel, LongformerTokenizerFast
-from sklearn.metrics.pairwise import cosine_similarity
-from keybert._mmr import mmr
+import torch
+from keybert import KeyBERT
 from keybert._maxsum import max_sum_distance
+from keybert._mmr import mmr
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+from transformers import LongformerModel, LongformerTokenizerFast
 from typing import Any
+
+from api import DocumentBase, EmbedderBase, KeyWordExtractorBase
+from lexis import clean_ru_text, lemmatize_doc, stopwords_ru
 
 
 class RuLongrormerEmbedder(EmbedderBase):
@@ -27,7 +25,8 @@ class RuLongrormerEmbedder(EmbedderBase):
         self.model.to(device)
 
         batches = [
-            self.tokenizer(document, return_tensors="pt") for document in documents
+            self.tokenizer(document, return_tensors="pt")
+            for document in documents
         ]
 
         # set global attention for cls token
@@ -42,7 +41,9 @@ class RuLongrormerEmbedder(EmbedderBase):
             ]
 
             # add global attention mask to batch
-            batch["global_attention_mask"] = torch.tensor(global_attention_mask)
+            batch["global_attention_mask"] = torch.tensor(
+                global_attention_mask
+            )
 
             with torch.no_grad():
                 output = self.model(**batch.to(device))
@@ -56,7 +57,9 @@ class RuLongrormerEmbedder(EmbedderBase):
 
 class KeyBERTModel:
     def __init__(
-        self, doc_embedder: EmbedderBase, word_embedder: EmbedderBase | None = None
+        self,
+        doc_embedder: EmbedderBase,
+        word_embedder: EmbedderBase | None = None,
     ) -> None:
         self.word_embedder = (
             word_embedder if word_embedder is not None else doc_embedder
@@ -76,7 +79,7 @@ class KeyBERTModel:
         use_mmr: bool = False,
         diversity: float = 0.7,
         nr_candidates: int = 20,
-        **kwargs
+        **kwargs,
     ) -> list[tuple[str, float]]:
         """
         Arguments:
@@ -123,7 +126,10 @@ class KeyBERTModel:
 
 class KeyBERTExtractor(KeyWordExtractorBase):
     def __init__(
-        self, model: str | KeyBERTModel | Any, method_name: str = "KBRT", **kwargs
+        self,
+        model: str | KeyBERTModel | Any,
+        method_name: str = "KBRT",
+        **kwargs,
     ) -> None:
         self.method_name = method_name
         if isinstance(model, KeyBERTModel):
@@ -131,7 +137,7 @@ class KeyBERTExtractor(KeyWordExtractorBase):
         else:
             self.model = KeyBERT(model)
         self.text_extraction_func = kwargs.get(
-            "text_extraction_func", lambda doc: clean_ru_text(doc.text)
+            "text_extraction_func", lambda doc: doc.text
         )
 
     def get_keywords(

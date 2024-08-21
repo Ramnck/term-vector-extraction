@@ -1,13 +1,13 @@
-from api import KeyWordExtractorBase, DocumentBase
+import yake
+
+from api import DocumentBase, KeyWordExtractorBase
 from lexis import (
-    stopwords_ru,
     clean_ru_text,
     lemmatize_doc,
     lemmatize_ru_word,
     replace_words_with_custom_function,
+    stopwords_ru,
 )
-
-import yake
 
 
 class YAKExtractor(KeyWordExtractorBase):
@@ -19,7 +19,9 @@ class YAKExtractor(KeyWordExtractorBase):
         )
 
     def get_keywords(self, doc: DocumentBase, num=50, **kwargs) -> list[str]:
-        cleaned_text = replace_words_with_custom_function(doc.text, lemmatize_ru_word)
+        cleaned_text = replace_words_with_custom_function(
+            doc.text, lemmatize_ru_word
+        )
         out = self.y.extract_keywords(cleaned_text)
         return [i[0] for i in out[:num]]
 

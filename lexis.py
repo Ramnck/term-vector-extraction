@@ -1,11 +1,12 @@
-from pymorphy3 import MorphAnalyzer
-import nltk.corpus
 import re
+from itertools import chain, cycle
 
-from typing import Callable
-from api import DocumentBase
-from itertools import cycle, chain
+import nltk.corpus
 from pathlib import Path
+from pymorphy3 import MorphAnalyzer
+from typing import Callable
+
+from api import DocumentBase
 
 morph = MorphAnalyzer()
 
