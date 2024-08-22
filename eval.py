@@ -1,15 +1,12 @@
-import json
-
 import asyncio
+import json
 from pathlib import Path
 
 from documents import FileSystem
 from lexis import extract_number
 
 
-async def eval(
-    name_of_file_to_save: str | Path, name_of_dir_to_read: str | Path
-):
+async def eval(name_of_file_to_save: str | Path, name_of_dir_to_read: str | Path):
     base_path = Path("data") / "eval"
 
     eval_dict = {
@@ -52,18 +49,12 @@ async def eval(
 
                 metrics[extractor_name]["soft"] += num_of_hits > 0
                 if len(evaluate_data) > 1:
-                    metrics[extractor_name]["avg"] += num_of_hits / len(
-                        evaluate_data
-                    )
-                    metrics[extractor_name]["hard"] += num_of_hits == len(
-                        evaluate_data
-                    )
+                    metrics[extractor_name]["avg"] += num_of_hits / len(evaluate_data)
+                    metrics[extractor_name]["hard"] += num_of_hits == len(evaluate_data)
                 metrics[extractor_name]["all_docs"] += 1
 
             if relevant:
-                metrics[extractor_name]["self_top1"] += (
-                    relevant[0] == file_path.stem
-                )
+                metrics[extractor_name]["self_top1"] += relevant[0] == file_path.stem
             else:
                 metrics[extractor_name]["no_relevant"] += 1
 

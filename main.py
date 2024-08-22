@@ -3,17 +3,17 @@ import os
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
 import argparse
+import asyncio
 import json
 import logging
 import sys
 import time
 from itertools import chain, cycle
+from pathlib import Path
 
 import aiofiles
-import asyncio
 import numpy as np
 from dotenv import load_dotenv
-from pathlib import Path
 from sentence_transformers import SentenceTransformer
 from tqdm.asyncio import tqdm_asyncio
 
@@ -70,14 +70,10 @@ async def main(
 ):
     logger.info("Начало обработки")
 
-    performance = {
-        i.get_name(): {"document_len": [], "time": []} for i in extractors
-    }
+    performance = {i.get_name(): {"document_len": [], "time": []} for i in extractors}
 
     num_of_doc = 0
-    async for doc in tqdm_asyncio(
-        aiter(loader), total=num_of_docs, desc="Progress"
-    ):
+    async for doc in tqdm_asyncio(aiter(loader), total=num_of_docs, desc="Progress"):
         num_of_doc += 1
 
         data = {"56": doc.citations, "cluster": list(doc.cluster)}
@@ -93,9 +89,7 @@ async def main(
             logger.info(" ".join(map(lambda x: x.id_date, cluster)))
 
         for extractor_name in keywords.keys():
-            keywords[extractor_name] = make_extended_term_vec(
-                keywords[extractor_name]
-            )
+            keywords[extractor_name] = make_extended_term_vec(keywords[extractor_name])
         data["keywords"] = keywords
 
         relevant = await get_relevant(keywords, api)
@@ -103,15 +97,10 @@ async def main(
         data["relevant"] = relevant
 
         path_of_file = (
-            BASE_DATA_PATH
-            / "eval"
-            / name_of_experiment
-            / (doc.id_date + ".json")
+            BASE_DATA_PATH / "eval" / name_of_experiment / (doc.id_date + ".json")
         )
         if await save_data_to_json(data, path_of_file):
-            logger.error(
-                "Error occured while saving %s file" % path_of_file.name
-            )
+            logger.error("Error occured while saving %s file" % path_of_file.name)
 
         if num_of_docs is not None:
             if num_of_doc >= num_of_docs:
@@ -123,18 +112,14 @@ async def main(
         out = f"{extractor_name} : {round(mean_time, 2)} s"
         logger.info(out)
 
-    path_of_file = (
-        BASE_DATA_PATH / "eval" / (name_of_experiment + "_performance.json")
-    )
+    path_of_file = BASE_DATA_PATH / "eval" / (name_of_experiment + "_performance.json")
     if await save_data_to_json(performance, path_of_file):
         logger.error("Error occured while saving %s file" % path_of_file.name)
 
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(
-        description="Extract term vectors from documents"
-    )
+    parser = argparse.ArgumentParser(description="Extract term vectors from documents")
     parser.add_argument("-i", "--input", default="clusters")
     parser.add_argument("-o", "--output", default="80")
     parser.add_argument("-n", "--number", default=None, type=int)

@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -5,12 +6,11 @@ import random
 import re
 import sys
 import time
+from pathlib import Path
 
 import aiofiles
-import asyncio
 import numpy as np
 from dotenv import load_dotenv
-from pathlib import Path
 
 from api import DocumentBase, KeyWordExtractorBase, LoaderBase
 from lexis import (
@@ -90,9 +90,7 @@ async def extract_keywords_from_docs(
                         tmp_kws.append(kw)
                         if performance is not None:
                             performance[name]["time"].append(time.time() - t)
-                            performance[name]["document_len"].append(
-                                len(doc.text)
-                            )
+                            performance[name]["document_len"].append(len(doc.text))
 
             kws[name] = tmp_kws
 
@@ -154,35 +152,38 @@ async def test_different_vectors(
 ) -> dict[str, list[str]]:
 
     relevant = {}
-    for len_of_vec in lens_of_vec:
-        for extractor_name, term_vec_vec in data_keywords.items():
-            async with asyncio.TaskGroup() as tg:
-                for method in methods:
-                    name = (
-                        extractor_name + "_" + method + "_" + str(len_of_vec)
-                    )
-                    if method == "expand":
-                        term_vec = make_extended_term_vec(
-                            term_vec_vec[1:],
-                            base_vec=term_vec_vec[0],
-                            length=len_of_vec,
-                        )
-                    elif method == "mix":
-                        term_vec = make_extended_term_vec(
-                            term_vec_vec, length=len_of_vec
-                        )
-                    elif method == "shuffle":
-                        for i in term_vec_vec:
-                            random.shuffle(i)
-                        term_vec = make_extended_term_vec(
-                            term_vec_vec, length=len_of_vec
-                        )
-                    elif method == "raw":
-                        term_vec = term_vec_vec[0]
+    try:
+        for len_of_vec in lens_of_vec:
+            for extractor_name, term_vec_vec in data_keywords.items():
+                async with asyncio.TaskGroup() as tg:
+                    for method in methods:
+                        name = extractor_name + "_" + method + "_" + str(len_of_vec)
+                        if method == "expand":
+                            term_vec = make_extended_term_vec(
+                                term_vec_vec[1:],
+                                base_vec=term_vec_vec[0],
+                                length=len_of_vec,
+                            )
+                        elif method == "mix":
+                            term_vec = make_extended_term_vec(
+                                term_vec_vec, length=len_of_vec
+                            )
+                        elif method == "shuffle":
+                            for i in term_vec_vec:
+                                random.shuffle(i)
+                            term_vec = make_extended_term_vec(
+                                term_vec_vec, length=len_of_vec
+                            )
+                        elif method == "raw":
+                            term_vec = term_vec_vec[0]
 
-                    relevant[name] = tg.create_task(
-                        api.find_relevant_by_keywords(term_vec, 30)
-                    )
+                        relevant[name] = tg.create_task(
+                            api.find_relevant_by_keywords(term_vec, 30)
+                        )
+    except* Exception as exs:
+        for ex in exs.exceptions:
+            logger.error("Exception in test_different, vectors %s" % str(ex))
+
     relevant = {k: v.result() for k, v in relevant.items()}
 
     return relevant

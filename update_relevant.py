@@ -1,14 +1,14 @@
 import argparse
+import asyncio
 import json
 import logging
 import os
 import sys
 import time
+from pathlib import Path
 
 import aiofiles
-import asyncio
 import numpy as np
-from pathlib import Path
 from tqdm.asyncio import tqdm_asyncio
 
 from api import LoaderBase
@@ -39,21 +39,16 @@ async def main(
         output_path = input_path
 
     num_of_doc = 0
-    async for doc in tqdm_asyncio(
-        aiter(loader), total=num_of_docs, desc="Progress"
-    ):
+    async for doc in tqdm_asyncio(aiter(loader), total=num_of_docs, desc="Progress"):
         num_of_doc += 1
 
-        path_of_file = (
-            BASE_DATA_PATH / "eval" / input_path / (doc.id_date + ".json")
-        )
+        path_of_file = BASE_DATA_PATH / "eval" / input_path / (doc.id_date + ".json")
         data = await load_data_from_json(path_of_file)
         if not data:
             logger.error("File %s not found" % path_of_file.name)
-            num_of_doc += 1
             continue
 
-        relevant = data["relevant"]
+        relevant = data.get("relevant", {})
 
         relevant_update = {}
         for k in relevant.keys():
@@ -79,13 +74,9 @@ async def main(
 
         data["relevant"] = relevant
 
-        path_of_file = (
-            BASE_DATA_PATH / "eval" / output_path / (doc.id_date + ".json")
-        )
+        path_of_file = BASE_DATA_PATH / "eval" / output_path / (doc.id_date + ".json")
         if await save_data_to_json(data, path_of_file):
-            logger.error(
-                "Error occured while saving %s file" % path_of_file.name
-            )
+            logger.error("Error occured while saving %s file" % path_of_file.name)
 
         if num_of_docs is not None:
             if num_of_doc >= num_of_docs:
@@ -98,7 +89,7 @@ if __name__ == "__main__":
         description="Update timeouts(repeat querries) after get_relevant.py"
     )
 
-    parser.add_argument("-i", "--input", default="80")
+    parser.add_argument("-i", "--input", default="80_rel")
     parser.add_argument("-o", "--output", default="80_rel")
     parser.add_argument(
         "-d",

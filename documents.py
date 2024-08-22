@@ -3,12 +3,12 @@ import logging
 import random
 import re
 import xml.etree.ElementTree as ET
+from enum import StrEnum
 from itertools import compress
+from pathlib import Path
 
 import aiofiles
 import aiohttp
-from enum import StrEnum
-from pathlib import Path
 
 from api import DocumentBase, LoaderBase
 
@@ -152,8 +152,7 @@ class FipsAPI(LoaderBase):
             q=" OR ".join(compress(kws, kws)), offset=offset, limit=num_of_docs
         )
         docs = [
-            re.sub(r"[^0-9a-zA-Zа-яА-Я_]", "", i["id"])
-            for i in res.get("hits", [])
+            re.sub(r"[^0-9a-zA-Zа-яА-Я_]", "", i["id"]) for i in res.get("hits", [])
         ]
 
         return docs
@@ -162,7 +161,9 @@ class FipsAPI(LoaderBase):
 class XMLDoc(DocumentBase):
     def extract_citaions(text: str) -> list[str]:
         # Регулярное выражение для патентной заявки
-        pattern = r"\b[A-Z]{2} ?\d+ ?[A-ZА-Я]\d?, ?\d{2,4}[ .,/\\-]\d{2}[ .,/\\-]\d{2,4}\b"
+        pattern = (
+            r"\b[A-Z]{2} ?\d+ ?[A-ZА-Я]\d?, ?\d{2,4}[ .,/\\-]\d{2}[ .,/\\-]\d{2,4}\b"
+        )
 
         # Найти все патентные документы в строке
         matches = re.findall(pattern, text)
@@ -206,9 +207,7 @@ class XMLDoc(DocumentBase):
         refs = []
         if tag is None:
             return ""
-        for i in tag.findall(
-            XMLDoc.Namespace.pat + "ReferenceCitationFreeFormat"
-        ):
+        for i in tag.findall(XMLDoc.Namespace.pat + "ReferenceCitationFreeFormat"):
             if i.text:
                 refs.append(i.text)
             for j in i:
@@ -229,9 +228,7 @@ class XMLDoc(DocumentBase):
         description = self.xml_obj.find(XMLDoc.Namespace.pat + "Description")
         if description is None:
             return ""
-        description = " ".join(
-            [i.text for i in description if i.text is not None]
-        )
+        description = " ".join([i.text for i in description if i.text is not None])
         return description
 
     @property
@@ -244,9 +241,7 @@ class XMLDoc(DocumentBase):
         claims = []
 
         for claim in claims_root.findall(XMLDoc.Namespace.pat + "Claim"):
-            for claim_text in claim.findall(
-                XMLDoc.Namespace.pat + "ClaimText"
-            ):
+            for claim_text in claim.findall(XMLDoc.Namespace.pat + "ClaimText"):
                 if claim_text.text is not None:
                     claims.append(claim_text.text)
 
@@ -255,9 +250,7 @@ class XMLDoc(DocumentBase):
     @property
     def abstract(self) -> str:
         abstracts = []
-        for abstract in self.xml_obj.findall(
-            XMLDoc.Namespace.pat + "Abstract"
-        ):
+        for abstract in self.xml_obj.findall(XMLDoc.Namespace.pat + "Abstract"):
             for p in abstract:
                 if p.text is not None:
                     abstracts.append(p.text)
@@ -285,9 +278,7 @@ class XMLDoc(DocumentBase):
 
         if id_temp is None:
             tag = self.xml_obj.find(XMLDoc.Namespace.pat + "BibliographicData")
-            tags = tag.findall(
-                XMLDoc.Namespace.pat + "PatentPublicationIdentification"
-            )
+            tags = tag.findall(XMLDoc.Namespace.pat + "PatentPublicationIdentification")
             for i in tags:
                 if i.attrib[XMLDoc.Namespace.pat + "dataFormat"] == "original":
                     tag = i
@@ -301,9 +292,7 @@ class XMLDoc(DocumentBase):
         tag = self.xml_obj.find(XMLDoc.Namespace.com + "PublicationDate")
         if tag is None:
             tag = self.xml_obj.find(XMLDoc.Namespace.pat + "BibliographicData")
-            tags = tag.findall(
-                XMLDoc.Namespace.pat + "PatentPublicationIdentification"
-            )
+            tags = tag.findall(XMLDoc.Namespace.pat + "PatentPublicationIdentification")
             for i in tags:
                 if i.attrib[XMLDoc.Namespace.pat + "dataFormat"] == "original":
                     tag = i
@@ -323,19 +312,13 @@ class XMLDoc(DocumentBase):
         citation_docs = xml.find(XMLDoc.Namespace.pat + "DocumentCitationBag")
         if citation_docs is not None:
             raw_str_xmls |= set(
-                citation_docs.findall(
-                    XMLDoc.Namespace.pat + "DocumentCitation"
-                )
+                citation_docs.findall(XMLDoc.Namespace.pat + "DocumentCitation")
             )
 
-        analog_cited_docs = xml.find(
-            XMLDoc.Namespace.pat + "AnalogOfCitationBag"
-        )
+        analog_cited_docs = xml.find(XMLDoc.Namespace.pat + "AnalogOfCitationBag")
         if analog_cited_docs is not None:
             raw_str_xmls |= set(
-                analog_cited_docs.findall(
-                    XMLDoc.Namespace.pat + "AnalogOfCitation"
-                )
+                analog_cited_docs.findall(XMLDoc.Namespace.pat + "AnalogOfCitation")
             )
 
         analog_docs = xml.find(XMLDoc.Namespace.pat + "DocumentAnalogBag")

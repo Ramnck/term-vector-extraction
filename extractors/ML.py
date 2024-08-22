@@ -1,3 +1,5 @@
+from typing import Any
+
 import numpy as np
 import torch
 from keybert import KeyBERT
@@ -6,7 +8,6 @@ from keybert._mmr import mmr
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from transformers import LongformerModel, LongformerTokenizerFast
-from typing import Any
 
 from api import DocumentBase, EmbedderBase, KeyWordExtractorBase
 from lexis import clean_ru_text, lemmatize_doc, stopwords_ru
@@ -25,8 +26,7 @@ class RuLongrormerEmbedder(EmbedderBase):
         self.model.to(device)
 
         batches = [
-            self.tokenizer(document, return_tensors="pt")
-            for document in documents
+            self.tokenizer(document, return_tensors="pt") for document in documents
         ]
 
         # set global attention for cls token
@@ -41,9 +41,7 @@ class RuLongrormerEmbedder(EmbedderBase):
             ]
 
             # add global attention mask to batch
-            batch["global_attention_mask"] = torch.tensor(
-                global_attention_mask
-            )
+            batch["global_attention_mask"] = torch.tensor(global_attention_mask)
 
             with torch.no_grad():
                 output = self.model(**batch.to(device))
