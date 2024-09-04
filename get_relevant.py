@@ -52,6 +52,10 @@ async def main(
             api,
         )
 
+        # keywords = {k: v[0] for k, v in data["keywords"].items()}
+
+        # relevant = await get_relevant(keywords, api)
+
         data["relevant"] = relevant
 
         path_of_file = BASE_DATA_PATH / "eval" / output_path / (doc.id_date + ".json")

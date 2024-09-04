@@ -52,25 +52,24 @@ async def main(
 
         relevant_update = {}
         for k in relevant.keys():
-            ex, method, length = k.split("_")
-            if not relevant.get(k, []):
-                new_rel = await test_different_vectors(
-                    {ex: data["keywords"][ex]}, [method], [int(length)], api
-                )
+            if not relevant[k]:
+                ex = k.split("_")
+                if len(ex) == 3:
+                    ex, method, length = ex
+                    new_rel = await test_different_vectors(
+                        {ex: data["keywords"][ex]}, [method], [int(length)], api
+                    )
+                elif len(ex) == 1:
+                    ex = ex[0]
+                    new_rel = await get_relevant({ex: data["keywords"][ex][0]}, api)
+
                 relevant_update[k] = new_rel[k]
 
-        # for k, v in relevant_update.items():
-        #     if not v:
-        #         logger.error("%s is empty in update!" % k)
         relevant.update(relevant_update)
 
         for k, v in relevant.items():
             if not v:
                 logger.error("%s kws is empty!" % k)
-
-        # relevant = await test_different_vectors(
-        # data["keywords"], ["expand", "mix"], [100, 125, 150, 175, 200], api
-        # )
 
         data["relevant"] = relevant
 

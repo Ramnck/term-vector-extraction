@@ -76,7 +76,10 @@ async def main(
     async for doc in tqdm_asyncio(aiter(loader), total=num_of_docs, desc="Progress"):
         num_of_doc += 1
 
-        data = {"56": doc.citations, "cluster": list(doc.cluster)}
+        if doc.id_date != "RU2291285C1_20070110":
+            continue
+
+        data = {"doc_id": doc.id, "56": doc.citations, "cluster": doc.cluster}
 
         cluster = await get_cluster_from_document(doc, api)
 

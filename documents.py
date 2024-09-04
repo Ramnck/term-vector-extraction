@@ -1,14 +1,16 @@
+import asyncio
 import json
 import logging
 import random
 import re
 import xml.etree.ElementTree as ET
 from enum import StrEnum
-from itertools import compress
+from itertools import compress, product
 from pathlib import Path
 
 import aiofiles
 import aiohttp
+from elasticsearch import AsyncElasticsearch
 
 from api import DocumentBase, LoaderBase
 
@@ -77,12 +79,20 @@ class FipsDoc(DocumentBase):
 
     @property
     def id(self) -> str:
-        temp = self.raw_json["id"]
-        return temp[: temp.index("_")]
+        out = self.raw_json.get("id", "")
+        out = out.split("_")[0]
+        if not out:
+            pub_off = self.raw_json["common"]["publishing_office"]
+            doc_num = self.raw_json["common"]["document_number"]
+            kind = self.raw_json["common"]["kind"]
+            out = pub_off + doc_num.lstrip("0") + kind
+        return out
 
     @property
     def date(self) -> str:
-        return self.raw_json["common"]["publication_date"].replace(".", "")
+        date = self.raw_json["common"]["publication_date"]
+        split_date = re.split(r"[ .,/\\-]", date)
+        return "".join(split_date)
 
 
 class FipsAPI(LoaderBase):
@@ -117,6 +127,11 @@ class FipsAPI(LoaderBase):
         num_of_doc = re.findall(r"\d+", id)[0].lstrip("0")
 
         res = await self._search_query(q=f"PN={num_of_doc}")
+
+        if error := res.get("error"):
+            logger.error(error)
+            return None
+
         res = res.get("hits", [])
 
         langs = {hit["snippet"]["lang"]: hit for hit in res}
@@ -140,8 +155,11 @@ class FipsAPI(LoaderBase):
                     logger.debug(await res.text())
                     return None
 
-    async def get_random_doc(self) -> FipsDoc:
+    async def get_random_doc(self) -> FipsDoc | None:
         res = await self._search_query(q=random.choice(rand_terms), limit=20)
+        if error := res.get("error"):
+            logger.error(error)
+            return None
         doc = random.choice(res.get("hits", []))
         return await self.get_doc_by_id_date(doc.get("id", "no_id"))
 
@@ -151,6 +169,11 @@ class FipsAPI(LoaderBase):
         res = await self._search_query(
             q=" OR ".join(compress(kws, kws)), offset=offset, limit=num_of_docs
         )
+
+        if error := res.get("error"):
+            logger.error(error)
+            return []
+
         docs = [
             re.sub(r"[^0-9a-zA-Zа-яА-Я_]", "", i["id"]) for i in res.get("hits", [])
         ]
@@ -288,7 +311,7 @@ class XMLDoc(DocumentBase):
         return id_temp
 
     @property
-    def date(self) -> set:
+    def date(self) -> str:
         tag = self.xml_obj.find(XMLDoc.Namespace.com + "PublicationDate")
         if tag is None:
             tag = self.xml_obj.find(XMLDoc.Namespace.pat + "BibliographicData")
@@ -301,39 +324,39 @@ class XMLDoc(DocumentBase):
         return tag.text
 
     @property
-    def cluster(self) -> set[str]:
+    def cluster(self) -> list[str]:
         xml = self.xml_obj
-        out = set()
+        out = list()
 
-        raw_str_xmls = set()
+        raw_str_xmls = list()
 
-        raw_str_xmls.add(xml)
+        raw_str_xmls.append(xml)
 
         citation_docs = xml.find(XMLDoc.Namespace.pat + "DocumentCitationBag")
         if citation_docs is not None:
-            raw_str_xmls |= set(
-                citation_docs.findall(XMLDoc.Namespace.pat + "DocumentCitation")
+            raw_str_xmls += citation_docs.findall(
+                XMLDoc.Namespace.pat + "DocumentCitation"
             )
 
         analog_cited_docs = xml.find(XMLDoc.Namespace.pat + "AnalogOfCitationBag")
         if analog_cited_docs is not None:
-            raw_str_xmls |= set(
-                analog_cited_docs.findall(XMLDoc.Namespace.pat + "AnalogOfCitation")
+            raw_str_xmls += analog_cited_docs.findall(
+                XMLDoc.Namespace.pat + "AnalogOfCitation"
             )
 
         analog_docs = xml.find(XMLDoc.Namespace.pat + "DocumentAnalogBag")
         if analog_docs is not None:
-            raw_str_xmls |= set(
-                analog_docs.findall(XMLDoc.Namespace.pat + "DocumentAnalog")
-            )
+            raw_str_xmls += analog_docs.findall(XMLDoc.Namespace.pat + "DocumentAnalog")
+
+        raw_str_xmls = list(dict.fromkeys(raw_str_xmls))
 
         for raw_str_xml in raw_str_xmls:
             temp_doc = XMLDoc(raw_str_xml)
             if temp_doc.id_date is not None:
-                out.add(temp_doc.id_date)
-            out |= set(temp_doc.citations)
+                out.append(temp_doc.id_date)
+            out += temp_doc.citations
 
-        return out
+        return list(dict.fromkeys(out))
 
 
 class FileSystem(LoaderBase):
@@ -378,3 +401,148 @@ class FileSystem(LoaderBase):
                 doc_path = file
 
         return await self._open_file(doc_path)
+
+
+class InternalESAPI(LoaderBase):
+    def __init__(self, ip: str | None) -> None:
+        if ip is None:
+            raise ValueError("ElasticSearch Url not specified")
+        self.es = AsyncElasticsearch(ip)
+        self.index = ["july24_ru"]
+        self.languages = ["ja", "fr", "ru", "it", "de", "en", "ko", "es"]
+        self.fields_without_languages = [
+            "biblio.{}.title",
+            "abstract_cleaned.{}",
+            "claims_cleaned.{}",
+            "description_cleaned.{}",
+            "layers.lexis.biblio.{}.title",
+            "layers.lexis.abstract_cleaned.{}",
+            "layers.lexis.claims_cleaned.{}",
+            "layers.lexis.description_cleaned.{}",
+        ]
+
+    @property
+    def _fields(self) -> list[str]:
+        return [
+            f.format(l)
+            for f, l in product(self.fields_without_languages, self.languages)
+        ]
+
+    def __del__(self):
+        asyncio.run(self.es.close())
+
+    async def find_relevant_by_keywords(
+        self, kws: list[str], num_of_docs=20, offset=0
+    ) -> list[str]:
+        _source_includes = [
+            "common.document_number",
+            "common.kind",
+            "common.publishing_office",
+            "id",
+        ]
+        query = {
+            "query": {
+                "bool": {
+                    "should": [
+                        {
+                            "query_string": {
+                                "query": " ".join(kws),
+                                "fields": self._fields,
+                                "type": "most_fields",
+                                "default_operator": "OR",
+                                "quote_field_suffix": ".no_stemmer",
+                            }
+                        }
+                    ],
+                    "minimum_should_match": 1,
+                }
+            }
+        }
+        res = await self.es.search(
+            index=self.index,
+            body=query,
+            _source_includes=_source_includes,
+            timeout=30,
+            size=num_of_docs,
+            from_=offset,
+        )
+
+        docs = [
+            re.sub(r"[^0-9a-zA-Zа-яА-Я_]", "", i["id"]) for i in res.get("hits", [])
+        ]
+
+        return docs
+
+    async def get_doc(self, id: str) -> FipsDoc | None:
+        num_of_doc = re.findall(r"\d+", id)[0].lstrip("0")
+
+        _source_includes = [
+            "common.document_number",
+            "common.kind",
+            "common.publishing_office",
+            "common.publication_date",
+            "id",
+            # "common.citated_docs",
+            # "claims",
+            # "abstract",
+            # "description",
+        ]
+
+        query = {
+            "query": {
+                "bool": {
+                    "should": [
+                        {
+                            "query_string": {
+                                "query": num_of_doc,
+                                "fields": ["id", "common.document_number"],
+                            }
+                        }
+                    ],
+                    "minimum_should_match": 1,
+                }
+            }
+        }
+
+        res = await self.es.search(
+            index=self.index, body=query, _source_includes=_source_includes, timeout=30
+        )
+
+        res = res.get("hits", [])
+
+        langs = {hit["snippet"]["lang"]: hit for hit in res}
+        res = langs.get("ru", None)
+        if res is None:
+            res = langs.get("en", None)
+
+        if res is not None:
+            res = await self.get_doc_by_id_date(res["id"])
+        return res
+
+    async def get_doc_by_id_date(self, id_date: str) -> FipsDoc | None:
+        _source_includes = [
+            "common.document_number",
+            "common.kind",
+            "common.publishing_office",
+            "common.publication_date",
+            "id",
+            "common.citated_docs",
+            "claims",
+            "abstract",
+            "description",
+        ]
+
+        query = {"query": {"match": {"id": id_date}}}
+
+        res = await self.es.search(
+            index=self.index,
+            body=query,
+            _source_includes=_source_includes,
+            timeout=30,
+            size=1,
+        )
+
+        if res["hits"]:
+            return FipsDoc(res["hits"][0])
+        else:
+            return None

@@ -49,7 +49,7 @@ def lemmatize_doc(
         doc = doc.split()
 
     for token in doc:
-        token = "".join(re.findall(r"[А-Яа-яA-Za-z0-9]+", token))
+        token = "".join(re.findall(r"[А-Яа-яA-Za-z0-9-]+", token.strip("-")))
         if token:
             token = lemmatize_ru_word(token)
             if token not in stopwords:
@@ -83,10 +83,8 @@ def make_extended_term_vec(
     timeout = 0
     timeout_val = sum(map(len, list_of_vecs)) * 3
 
-    while len(vec) < length:
+    while len(vec) < length and timeout < timeout_val:
         vec.add(lemmatize_ru_word(next(next(iterator))))
         timeout += 1
-        if timeout > timeout_val:
-            break
 
     return list(vec)

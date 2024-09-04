@@ -22,10 +22,11 @@ from lexis import (
 
 name = [Path(sys.argv[0]).name] + sys.argv[1:]
 filename = " ".join(name)
-# filename = "".join(re.findall(r"[A-Za-z0-9 \.\-]", filename))
+filename = re.sub(r'[\\/:*?"<>|]', "", filename)
 
 filepath = Path("data") / "logs" / filename
 filepath = filepath.parent / (filepath.name + ".log.txt")
+
 
 load_dotenv()
 logging.basicConfig(
@@ -41,6 +42,8 @@ logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 
 BASE_DATA_PATH = Path("data")
 FIPS_API_KEY = os.getenv("FIPS_API_KEY")
+ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL")
+
 
 if FIPS_API_KEY is None:
     logger.error("Не указан API ключ")
@@ -52,11 +55,10 @@ async def get_cluster_from_document(
 ) -> list[DocumentBase]:
     sub_docs = []
     async with asyncio.TaskGroup() as tg:
-        for sub_doc_id_date in doc.cluster:
+        for sub_doc_id_date in doc.cluster[1:]:
             sub_docs.append(tg.create_task(api.get_doc(sub_doc_id_date)))
     sub_docs = [i.result() for i in sub_docs if i.result() is not None]
-    sub_docs = set(sub_docs) - set([doc])
-    sub_docs = [doc] + list(sub_docs)
+    sub_docs = [doc] + sub_docs
 
     logger.debug(f"Total {len(sub_docs)} documents")
 
@@ -155,31 +157,32 @@ async def test_different_vectors(
     try:
         for len_of_vec in lens_of_vec:
             for extractor_name, term_vec_vec in data_keywords.items():
-                async with asyncio.TaskGroup() as tg:
-                    for method in methods:
-                        name = extractor_name + "_" + method + "_" + str(len_of_vec)
-                        if method == "expand":
-                            term_vec = make_extended_term_vec(
-                                term_vec_vec[1:],
-                                base_vec=term_vec_vec[0],
-                                length=len_of_vec,
-                            )
-                        elif method == "mix":
-                            term_vec = make_extended_term_vec(
-                                term_vec_vec, length=len_of_vec
-                            )
-                        elif method == "shuffle":
-                            for i in term_vec_vec:
-                                random.shuffle(i)
-                            term_vec = make_extended_term_vec(
-                                term_vec_vec, length=len_of_vec
-                            )
-                        elif method == "raw":
-                            term_vec = term_vec_vec[0]
+                for sub_methods in [methods[:2], methods[2:]]:
+                    async with asyncio.TaskGroup() as tg:
+                        for method in sub_methods:
+                            name = extractor_name + "_" + method + "_" + str(len_of_vec)
+                            if method == "expand":
+                                term_vec = make_extended_term_vec(
+                                    term_vec_vec[1:],
+                                    base_vec=term_vec_vec[0],
+                                    length=len_of_vec,
+                                )
+                            elif method == "mix":
+                                term_vec = make_extended_term_vec(
+                                    term_vec_vec, length=len_of_vec
+                                )
+                            elif method == "shuffle":
+                                for i in term_vec_vec:
+                                    random.shuffle(i)
+                                term_vec = make_extended_term_vec(
+                                    term_vec_vec, length=len_of_vec
+                                )
+                            elif method == "raw":
+                                term_vec = term_vec_vec[0]
 
-                        relevant[name] = tg.create_task(
-                            api.find_relevant_by_keywords(term_vec, 30)
-                        )
+                            relevant[name] = tg.create_task(
+                                api.find_relevant_by_keywords(term_vec, 30)
+                            )
     except* Exception as exs:
         for ex in exs.exceptions:
             logger.error("Exception in test_different, vectors %s" % str(ex))
