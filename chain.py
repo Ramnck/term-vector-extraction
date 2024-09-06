@@ -6,6 +6,7 @@ import random
 import re
 import sys
 import time
+from itertools import product
 from pathlib import Path
 
 import aiofiles
@@ -27,22 +28,25 @@ filename = re.sub(r'[\\/:*?"<>|]', "", filename)
 filepath = Path("data") / "logs" / filename
 filepath = filepath.parent / (filepath.name + ".log.txt")
 
+logging_format = "%(name)s - %(asctime)s - %(levelname)s - %(message)s"
 
 load_dotenv()
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
+    format=logging_format,
     datefmt="%H:%M:%S",
     filename=filepath,
     filemode="w+",
     encoding="utf-8",
 )
 logger = logging.getLogger(__name__)
-logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
+handler = logging.StreamHandler(sys.stdout)
+handler.setFormatter(logging.Formatter(logging_format))
+logging.getLogger().addHandler(handler)
 
 BASE_DATA_PATH = Path("data")
 FIPS_API_KEY = os.getenv("FIPS_API_KEY")
-ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL")
+ES_URL = os.getenv("ES_URL")
 
 
 if FIPS_API_KEY is None:
@@ -63,6 +67,12 @@ async def get_cluster_from_document(
     logger.debug(f"Total {len(sub_docs)} documents")
 
     return sub_docs
+
+
+def batched(iterable, n=1):
+    l = len(iterable)
+    for ndx in range(0, l, n):
+        yield iterable[ndx : min(ndx + n, l)]
 
 
 async def extract_keywords_from_docs(
@@ -151,42 +161,53 @@ async def test_different_vectors(
     methods: list[str],
     lens_of_vec: list[int],
     api: LoaderBase,
+    num_of_workers: int | None = 3,
 ) -> dict[str, list[str]]:
 
     relevant = {}
     try:
-        for len_of_vec in lens_of_vec:
-            for extractor_name, term_vec_vec in data_keywords.items():
-                for sub_methods in [methods[:2], methods[2:]]:
-                    async with asyncio.TaskGroup() as tg:
-                        for method in sub_methods:
-                            name = extractor_name + "_" + method + "_" + str(len_of_vec)
-                            if method == "expand":
-                                term_vec = make_extended_term_vec(
-                                    term_vec_vec[1:],
-                                    base_vec=term_vec_vec[0],
-                                    length=len_of_vec,
-                                )
-                            elif method == "mix":
-                                term_vec = make_extended_term_vec(
-                                    term_vec_vec, length=len_of_vec
-                                )
-                            elif method == "shuffle":
-                                for i in term_vec_vec:
-                                    random.shuffle(i)
-                                term_vec = make_extended_term_vec(
-                                    term_vec_vec, length=len_of_vec
-                                )
-                            elif method == "raw":
-                                term_vec = term_vec_vec[0]
+        method_array = list(product(lens_of_vec, data_keywords.items(), methods))
 
-                            relevant[name] = tg.create_task(
-                                api.find_relevant_by_keywords(term_vec, 30)
-                            )
+        for batch in batched(
+            method_array,
+            n=num_of_workers if num_of_workers is not None else len(method_array),
+        ):
+            async with asyncio.TaskGroup() as tg:
+                for len_of_vec, (extractor_name, term_vec_vec), method in batch:
+                    name = extractor_name + "_" + method + "_" + str(len_of_vec)
+                    if method == "expand":
+                        term_vec = make_extended_term_vec(
+                            term_vec_vec[1:],
+                            base_vec=term_vec_vec[0],
+                            length=len_of_vec,
+                        )
+                    elif method == "mix":
+                        term_vec = make_extended_term_vec(
+                            term_vec_vec, length=len_of_vec
+                        )
+                    elif method == "shuffle":
+                        term_vec_vec_copy = [i.copy() for i in term_vec_vec]
+                        for i in term_vec_vec_copy:
+                            random.shuffle(i)
+                        term_vec = make_extended_term_vec(
+                            term_vec_vec_copy, length=len_of_vec
+                        )
+                    elif method == "raw":
+                        term_vec = term_vec_vec[0]
+
+                    relevant[name] = tg.create_task(
+                        api.find_relevant_by_keywords(term_vec, 35)
+                    )
+
     except* Exception as exs:
         for ex in exs.exceptions:
             logger.error("Exception in test_different, vectors %s" % str(ex))
 
-    relevant = {k: v.result() for k, v in relevant.items()}
+    relevant_results = {}
+    for k, v in relevant.items():
+        try:
+            relevant_results[k] = v.result()
+        except:
+            pass
 
-    return relevant
+    return relevant_results

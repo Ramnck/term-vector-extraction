@@ -1,0 +1,83 @@
+{
+    "query": {
+        "bool": {
+            "should": [
+                {
+                    "query_string": {
+                        "query": "система посадки квадрокоптера",
+                        "fields": [
+                            "biblio.ja.title",
+                            "biblio.fr.title",
+                            "biblio.ru.title",
+                            "biblio.it.title",
+                            "biblio.de.title",
+                            "biblio.en.title",
+                            "biblio.ko.title",
+                            "biblio.es.title",
+                            "abstract_cleaned.ja",
+                            "abstract_cleaned.fr",
+                            "abstract_cleaned.ru",
+                            "abstract_cleaned.it",
+                            "abstract_cleaned.de",
+                            "abstract_cleaned.en",
+                            "abstract_cleaned.ko",
+                            "abstract_cleaned.es",
+                            "claims_cleaned.ja",
+                            "claims_cleaned.fr",
+                            "claims_cleaned.ru",
+                            "claims_cleaned.it",
+                            "claims_cleaned.de",
+                            "claims_cleaned.en",
+                            "claims_cleaned.ko",
+                            "claims_cleaned.es",
+                            "description_cleaned.ja",
+                            "description_cleaned.fr",
+                            "description_cleaned.ru",
+                            "description_cleaned.it",
+                            "description_cleaned.de",
+                            "description_cleaned.en",
+                            "description_cleaned.ko",
+                            "description_cleaned.es",
+                            "layers.lexis.biblio.ja.title",
+                            "layers.lexis.biblio.fr.title",
+                            "layers.lexis.biblio.ru.title",
+                            "layers.lexis.biblio.it.title",
+                            "layers.lexis.biblio.de.title",
+                            "layers.lexis.biblio.en.title",
+                            "layers.lexis.biblio.ko.title",
+                            "layers.lexis.biblio.es.title",
+                            "layers.lexis.abstract_cleaned.ja",
+                            "layers.lexis.abstract_cleaned.fr",
+                            "layers.lexis.abstract_cleaned.ru",
+                            "layers.lexis.abstract_cleaned.it",
+                            "layers.lexis.abstract_cleaned.de",
+                            "layers.lexis.abstract_cleaned.en",
+                            "layers.lexis.abstract_cleaned.ko",
+                            "layers.lexis.abstract_cleaned.es",
+                            "layers.lexis.claims_cleaned.ja",
+                            "layers.lexis.claims_cleaned.fr",
+                            "layers.lexis.claims_cleaned.ru",
+                            "layers.lexis.claims_cleaned.it",
+                            "layers.lexis.claims_cleaned.de",
+                            "layers.lexis.claims_cleaned.en",
+                            "layers.lexis.claims_cleaned.ko",
+                            "layers.lexis.claims_cleaned.es",
+                            "layers.lexis.description_cleaned.ja",
+                            "layers.lexis.description_cleaned.fr",
+                            "layers.lexis.description_cleaned.ru",
+                            "layers.lexis.description_cleaned.it",
+                            "layers.lexis.description_cleaned.de",
+                            "layers.lexis.description_cleaned.en",
+                            "layers.lexis.description_cleaned.ko",
+                            "layers.lexis.description_cleaned.es"
+                        ],
+                        "type": "most_fields",
+                        "default_operator": "OR",
+                        "quote_field_suffix": ".no_stemmer"
+                    }
+                }
+            ],
+            "minimum_should_match": 1
+        }
+    }
+}

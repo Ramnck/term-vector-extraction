@@ -10,12 +10,15 @@ from pathlib import Path
 
 import aiofiles
 import aiohttp
-from elasticsearch import AsyncElasticsearch
+from elasticsearch7 import AsyncElasticsearch, Elasticsearch, NotFoundError
 
 from api import DocumentBase, LoaderBase
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+es_logger = logging.getLogger("elasticsearch")
+es_logger.setLevel(logging.WARN)
 rand_terms = "ракета машина смазка установка самолет вертолёт автомат мотоцикл насос инструмент лист дерево обработка рост эволюция".split()
 
 
@@ -25,7 +28,7 @@ class FipsDoc(DocumentBase):
 
     @property
     def citations(self) -> list[str]:
-        return [i["identity"] for i in self.raw_json["common"]["citated_docs"]]
+        return [i["id"] for i in self.raw_json["common"]["citated_docs"]]
 
     @property
     def description(self) -> str:
@@ -407,8 +410,9 @@ class InternalESAPI(LoaderBase):
     def __init__(self, ip: str | None) -> None:
         if ip is None:
             raise ValueError("ElasticSearch Url not specified")
-        self.es = AsyncElasticsearch(ip)
-        self.index = ["july24_ru"]
+        Elasticsearch(hosts=[ip]).close()
+        self.es = AsyncElasticsearch(hosts=[ip])
+        self.index = ["july24_ru", "may22_us", "may22_de", "may22_kr", "may22_ep"]
         self.languages = ["ja", "fr", "ru", "it", "de", "en", "ko", "es"]
         self.fields_without_languages = [
             "biblio.{}.title",
@@ -429,7 +433,9 @@ class InternalESAPI(LoaderBase):
         ]
 
     def __del__(self):
-        asyncio.run(self.es.close())
+        hosts = self.es.transport.hosts
+        del self.es
+        Elasticsearch(hosts=hosts).close()
 
     async def find_relevant_by_keywords(
         self, kws: list[str], num_of_docs=20, offset=0
@@ -462,19 +468,32 @@ class InternalESAPI(LoaderBase):
             index=self.index,
             body=query,
             _source_includes=_source_includes,
-            timeout=30,
+            request_timeout=30,
             size=num_of_docs,
             from_=offset,
         )
 
         docs = [
-            re.sub(r"[^0-9a-zA-Zа-яА-Я_]", "", i["id"]) for i in res.get("hits", [])
+            re.sub(r"[^0-9a-zA-Zа-яА-Я_]", "", i["_source"]["id"])
+            for i in res["hits"]["hits"]
         ]
 
         return docs
 
     async def get_doc(self, id: str) -> FipsDoc | None:
-        num_of_doc = re.findall(r"\d+", id)[0].lstrip("0")
+        num_of_doc = re.findall(r"\d+", id)[0]
+
+        id_split = id.split(num_of_doc)
+        id_split = list(compress(id_split, id_split))
+
+        pub_office = ""
+        num_of_doc = num_of_doc.lstrip("0")
+        kind = ""
+
+        if len(id_split) > 0:
+            pub_office = id_split[0]
+        if len(id_split) > 1:
+            kind = id_split[1].split("_")[0]
 
         _source_includes = [
             "common.document_number",
@@ -482,6 +501,7 @@ class InternalESAPI(LoaderBase):
             "common.publishing_office",
             "common.publication_date",
             "id",
+            "snippet",
             # "common.citated_docs",
             # "claims",
             # "abstract",
@@ -497,27 +517,46 @@ class InternalESAPI(LoaderBase):
                                 "query": num_of_doc,
                                 "fields": ["id", "common.document_number"],
                             }
-                        }
+                        },
                     ],
                     "minimum_should_match": 1,
                 }
             }
         }
 
+        if pub_office:
+            query["query"]["bool"]["should"].append(
+                {
+                    "query_string": {
+                        "query": pub_office,
+                        "fields": ["common.publishing_office"],
+                    }
+                }
+            )
+
+        if kind:
+            query["query"]["bool"]["should"].append(
+                {
+                    "query_string": {
+                        "query": kind,
+                        "fields": ["common.kind"],
+                    }
+                }
+            )
+
         res = await self.es.search(
-            index=self.index, body=query, _source_includes=_source_includes, timeout=30
+            index=self.index,
+            body=query,
+            _source_includes=_source_includes,
+            request_timeout=30,
         )
 
-        res = res.get("hits", [])
+        res = res["hits"]["hits"]
 
-        langs = {hit["snippet"]["lang"]: hit for hit in res}
-        res = langs.get("ru", None)
-        if res is None:
-            res = langs.get("en", None)
-
-        if res is not None:
-            res = await self.get_doc_by_id_date(res["id"])
-        return res
+        if res:
+            return await self.get_doc_by_id_date(res[0]["_id"])
+        else:
+            return None
 
     async def get_doc_by_id_date(self, id_date: str) -> FipsDoc | None:
         _source_includes = [
@@ -532,17 +571,16 @@ class InternalESAPI(LoaderBase):
             "description",
         ]
 
-        query = {"query": {"match": {"id": id_date}}}
+        for index in self.index:
+            try:
+                res = await self.es.get(
+                    id=id_date,
+                    index=index,
+                    _source_includes=_source_includes,
+                    request_timeout=30,
+                )
+                return FipsDoc(res["_source"])
+            except NotFoundError as ex:
+                continue
 
-        res = await self.es.search(
-            index=self.index,
-            body=query,
-            _source_includes=_source_includes,
-            timeout=30,
-            size=1,
-        )
-
-        if res["hits"]:
-            return FipsDoc(res["hits"][0])
-        else:
-            return None
+        return None

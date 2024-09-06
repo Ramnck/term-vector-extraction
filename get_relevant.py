@@ -14,6 +14,7 @@ from tqdm.asyncio import tqdm_asyncio
 from api import LoaderBase
 from chain import (
     BASE_DATA_PATH,
+    ES_URL,
     FIPS_API_KEY,
     extract_keywords_from_docs,
     get_cluster_from_document,
@@ -22,7 +23,7 @@ from chain import (
     save_data_to_json,
     test_different_vectors,
 )
-from documents import FileSystem, FipsAPI
+from documents import FileSystem, FipsAPI, InternalESAPI
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +85,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    api = FipsAPI(FIPS_API_KEY)
+    # api = FipsAPI(FIPS_API_KEY)
+    api = InternalESAPI(ES_URL)
     loader = FileSystem(Path("data") / "raw" / args.docs)
 
     coro = main(loader, api, args.number, args.input, args.output)
