@@ -49,7 +49,7 @@ async def main(
         relevant = await test_different_vectors(
             data["keywords"],
             ["expand", "mix", "shuffle", "raw"],
-            [75, 100, 125, 150, 175, 200],
+            list(range(75, 401, 25)),
             api,
         )
 
