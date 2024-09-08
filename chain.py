@@ -54,11 +54,15 @@ if FIPS_API_KEY is None:
     exit(1)
 
 
+class ForgivingTaskGroup(asyncio.TaskGroup):
+    _abort = lambda self: None
+
+
 async def get_cluster_from_document(
     doc: DocumentBase, api: LoaderBase
 ) -> list[DocumentBase]:
     sub_docs = []
-    async with asyncio.TaskGroup() as tg:
+    async with ForgivingTaskGroup() as tg:
         for sub_doc_id_date in doc.cluster[1:]:
             sub_docs.append(tg.create_task(api.get_doc(sub_doc_id_date)))
     sub_docs = [i.result() for i in sub_docs if i.result() is not None]
@@ -117,7 +121,7 @@ async def get_relevant(
 ) -> dict[str, list[str]]:
     relevant = {}
 
-    async with asyncio.TaskGroup() as tg:
+    async with ForgivingTaskGroup() as tg:
         for extractor_name, kw in keywords.items():
             relevant[extractor_name] = tg.create_task(
                 api.find_relevant_by_keywords(kw, num_of_docs=30)
@@ -161,18 +165,18 @@ async def test_different_vectors(
     methods: list[str],
     lens_of_vec: list[int],
     api: LoaderBase,
-    num_of_workers: int | None = 3,
+    num_of_workers: int | None = None,
 ) -> dict[str, list[str]]:
 
     relevant = {}
-    try:
-        method_array = list(product(lens_of_vec, data_keywords.items(), methods))
+    method_array = list(product(lens_of_vec, data_keywords.items(), methods))
 
-        for batch in batched(
-            method_array,
-            n=num_of_workers if num_of_workers is not None else len(method_array),
-        ):
-            async with asyncio.TaskGroup() as tg:
+    for batch in batched(
+        method_array,
+        n=num_of_workers if num_of_workers is not None else len(method_array),
+    ):
+        try:
+            async with ForgivingTaskGroup() as tg:
                 for len_of_vec, (extractor_name, term_vec_vec), method in batch:
                     name = extractor_name + "_" + method + "_" + str(len_of_vec)
                     if method == "expand":
@@ -199,15 +203,15 @@ async def test_different_vectors(
                         api.find_relevant_by_keywords(term_vec, 35)
                     )
 
-    except* Exception as exs:
-        for ex in exs.exceptions:
-            logger.error("Exception in test_different, vectors %s" % str(ex))
+        except* Exception as exs:
+            for ex in exs.exceptions:
+                logger.error("Exception in test_different - %s" % str(ex))
 
     relevant_results = {}
     for k, v in relevant.items():
         try:
             relevant_results[k] = v.result()
         except:
-            pass
+            relevant_results[k] = []
 
     return relevant_results

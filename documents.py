@@ -468,7 +468,7 @@ class InternalESAPI(LoaderBase):
             index=self.index,
             body=query,
             _source_includes=_source_includes,
-            request_timeout=30,
+            request_timeout=15,
             size=num_of_docs,
             from_=offset,
         )
@@ -548,7 +548,7 @@ class InternalESAPI(LoaderBase):
             index=self.index,
             body=query,
             _source_includes=_source_includes,
-            request_timeout=30,
+            request_timeout=15,
         )
 
         res = res["hits"]["hits"]
@@ -577,7 +577,7 @@ class InternalESAPI(LoaderBase):
                     id=id_date,
                     index=index,
                     _source_includes=_source_includes,
-                    request_timeout=30,
+                    request_timeout=15,
                 )
                 return FipsDoc(res["_source"])
             except NotFoundError as ex:
