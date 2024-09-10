@@ -32,6 +32,15 @@ from documents import FileSystem, FipsAPI, InternalESAPI
 logger = logging.getLogger(__name__)
 
 
+async def process_document(relevant_coroutine, data_dict, dir_path):
+    relevant = await relevant_coroutine
+    data_dict["relevant"] = relevant
+
+    file_path = dir_path / (data_dict["doc_id"] + ".json")
+    if await save_data_to_json(data_dict, file_path):
+        raise RuntimeError("Error saving file %s" % file_path)
+
+
 async def main(
     loader: LoaderBase,
     api: LoaderBase,
@@ -46,7 +55,7 @@ async def main(
     methods = ["raw"]
     lens_of_vec = [125, 150, 175, 200]
 
-    relevant = dict()
+    # relevant = dict()
 
     progress_bar = tqdm(desc="Progress", total=num_of_docs)
 
@@ -66,10 +75,16 @@ async def main(
                     path_of_file = (
                         BASE_DATA_PATH / "eval" / input_path / (doc_id + ".json")
                     )
+
                     data = await load_data_from_json(path_of_file)
-                    relevant[doc_id] = tg.create_task(
-                        test_different_vectors(
-                            data["keywords"], methods, lens_of_vec, api, timeout=180
+
+                    rel_coro = test_different_vectors(
+                        data["keywords"], methods, lens_of_vec, api, timeout=180
+                    )
+
+                    tg.create_task(
+                        process_document(
+                            rel_coro, data, BASE_DATA_PATH / "eval" / output_path
                         )
                     )
 
@@ -79,18 +94,18 @@ async def main(
 
     progress_bar.close()
 
-    relevant_results = {}
-    for k, v in relevant.items():
-        try:
-            relevant_results[k] = v.result()
-        except:
-            pass
+    # relevant_results = {}
+    # for k, v in relevant.items():
+    #     try:
+    #         relevant_results[k] = v.result()
+    #     except:
+    #         pass
 
-    for doc_id, data in relevant_results.items():
-        path_of_file = BASE_DATA_PATH / "eval" / output_path / (doc_id + ".json")
+    # for doc_id, data in relevant_results.items():
+    #     path_of_file = BASE_DATA_PATH / "eval" / output_path / (doc_id + ".json")
 
-        if await save_data_to_json(data, path_of_file):
-            logger.error("Error occured while saving %s file" % path_of_file.name)
+    #     if await save_data_to_json(data, path_of_file):
+    #         logger.error("Error occured while saving %s file" % path_of_file.name)
 
 
 if __name__ == "__main__":
@@ -111,8 +126,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # api = FipsAPI(FIPS_API_KEY)
-    api = InternalESAPI(ES_URL)
+    api = FipsAPI(FIPS_API_KEY)
+    # api = InternalESAPI(ES_URL)
     loader = FileSystem(Path("data") / "raw" / args.docs)
 
     coro = main(loader, api, args.number, args.input, args.output, args.num_of_workers)
