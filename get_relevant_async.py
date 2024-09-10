@@ -42,7 +42,6 @@ async def process_document(relevant_coroutine, data_dict, dir_path):
 
 
 async def main(
-    loader: LoaderBase,
     api: LoaderBase,
     num_of_docs: int | None,
     input_path: str,
@@ -50,16 +49,16 @@ async def main(
     num_of_workers: int,
 ):
 
-    docs = [doc async for doc in loader][:num_of_docs]
+    dir_path = BASE_DATA_PATH / "eval" / input_path
+
+    doc_paths = list(dir_path.iterdir())[:num_of_docs]
 
     methods = ["raw"]
     lens_of_vec = [125, 150, 175, 200]
 
-    # relevant = dict()
-
     progress_bar = tqdm(desc="Progress", total=num_of_docs)
 
-    for doc_batch in batched(docs, n=num_of_workers):
+    for doc_path_batch in batched(doc_paths, n=num_of_workers):
         try:
             async with ForgivingTaskGroup() as tg:
 
@@ -69,14 +68,9 @@ async def main(
 
                 tg._on_task_done = new_on_task_done
 
-                for doc in doc_batch:
+                for doc_path in doc_path_batch:
 
-                    doc_id = doc.id_date
-                    path_of_file = (
-                        BASE_DATA_PATH / "eval" / input_path / (doc_id + ".json")
-                    )
-
-                    data = await load_data_from_json(path_of_file)
+                    data = await load_data_from_json(doc_path)
 
                     rel_coro = test_different_vectors(
                         data["keywords"], methods, lens_of_vec, api, timeout=180
@@ -94,19 +88,6 @@ async def main(
 
     progress_bar.close()
 
-    # relevant_results = {}
-    # for k, v in relevant.items():
-    #     try:
-    #         relevant_results[k] = v.result()
-    #     except:
-    #         pass
-
-    # for doc_id, data in relevant_results.items():
-    #     path_of_file = BASE_DATA_PATH / "eval" / output_path / (doc_id + ".json")
-
-    #     if await save_data_to_json(data, path_of_file):
-    #         logger.error("Error occured while saving %s file" % path_of_file.name)
-
 
 if __name__ == "__main__":
 
@@ -115,12 +96,6 @@ if __name__ == "__main__":
     )
     parser.add_argument("-i", "--input", default="80")
     parser.add_argument("-o", "--output", default="80_rel")
-    parser.add_argument(
-        "-d",
-        "--docs",
-        default="clusters",
-        help="Where to iterate over document id's (path to xmls)",
-    )
     parser.add_argument("-n", "--number", default=None, type=int)
     parser.add_argument("-w", "--num-of-workers", default=50, type=int)
 
@@ -128,7 +103,7 @@ if __name__ == "__main__":
 
     api = FipsAPI(FIPS_API_KEY)
     # api = InternalESAPI(ES_URL)
-    loader = FileSystem(Path("data") / "raw" / args.docs)
+    # loader = FileSystem(Path("data") / "raw" / args.docs)
 
-    coro = main(loader, api, args.number, args.input, args.output, args.num_of_workers)
+    coro = main(api, args.number, args.input, args.output, args.num_of_workers)
     asyncio.run(coro)
