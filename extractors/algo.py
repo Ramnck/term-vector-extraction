@@ -15,10 +15,10 @@ class YAKExtractor(KeyWordExtractorBase):
         self.model = None
         self.method_name = "YAKE"
         self.y = yake.KeywordExtractor(
-            lan="ru", n=1, dedupLim=dedupLim, top=50, stopwords=stopwords_ru
+            lan="ru", n=1, dedupLim=dedupLim, top=200, stopwords=stopwords_ru
         )
 
-    def get_keywords(self, doc: DocumentBase, num=50, **kwargs) -> list[str]:
+    def get_keywords(self, doc: DocumentBase, num: int = 50, **kwargs) -> list[str]:
         cleaned_text = replace_words_with_custom_function(doc.text, lemmatize_ru_word)
         out = self.y.extract_keywords(cleaned_text)
         return [i[0] for i in out[:num]]

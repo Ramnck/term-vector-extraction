@@ -13,6 +13,7 @@ import aiohttp
 from elasticsearch7 import AsyncElasticsearch, Elasticsearch, NotFoundError
 
 from api import DocumentBase, LoaderBase
+from lexis import extract_number
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -20,6 +21,55 @@ logger.setLevel(logging.DEBUG)
 es_logger = logging.getLogger("elasticsearch")
 es_logger.setLevel(logging.WARN)
 rand_terms = "ракета машина смазка установка самолет вертолёт автомат мотоцикл насос инструмент лист дерево обработка рост эволюция".split()
+
+
+class BlankDoc(DocumentBase):
+    def __init__(self) -> None:
+        self._text = None
+        self._citations = None
+        self._cluster = None
+        self._id = None
+        self._date = None
+
+    @property
+    def text(self) -> str:
+        return self._text
+
+    @text.setter
+    def text(self, value):
+        self._text = value
+
+    @property
+    def citations(self) -> list[str]:
+        return self._citations
+
+    @citations.setter
+    def citations(self, value):
+        self._citations = value
+
+    @property
+    def cluster(self) -> list[str]:
+        return self._cluster
+
+    @cluster.setter
+    def cluster(self, value):
+        self._cluster = value
+
+    @property
+    def id(self) -> str:
+        return self._id
+
+    @id.setter
+    def id(self, value):
+        self._id = value
+
+    @property
+    def date(self) -> str:
+        return self._date
+
+    @date.setter
+    def date(self, value):
+        self._date = value
 
 
 class FipsDoc(DocumentBase):
@@ -113,12 +163,17 @@ class FipsAPI(LoaderBase):
 
     async def _search_query(self, **kwargs) -> dict:
         async with aiohttp.ClientSession() as session:
+            timeout = kwargs.get("timeout", 30)
+            if "timeout" in kwargs.keys():
+                del kwargs["timeout"]
+
             data = json.dumps(kwargs, ensure_ascii=False)
 
             async with session.post(
                 self.api_url + "search",
                 data=data.encode("utf-8"),
                 headers=self._headers,
+                timeout=timeout,
             ) as res:
                 try:
                     return await res.json()
@@ -126,10 +181,16 @@ class FipsAPI(LoaderBase):
                     logger.debug(await res.text())
                     return {}
 
-    async def get_doc(self, id: str) -> FipsDoc | None:
-        num_of_doc = re.findall(r"\d+", id)[0].lstrip("0")
+    async def get_doc(self, id: str, timeout: int = 10) -> FipsDoc | None:
+        pub_office = id[:2]
+        num_of_doc = extract_number(id).lstrip("0")
 
-        res = await self._search_query(q=f"PN={num_of_doc}")
+        res = await self._search_query(
+            q=f"PN={num_of_doc}",
+            filter={"country": {"values": [pub_office]}},
+            timeout=timeout,
+            limit=3,
+        )
 
         if error := res.get("error"):
             logger.error(error)
@@ -149,7 +210,7 @@ class FipsAPI(LoaderBase):
     async def get_doc_by_id_date(self, id_date: str) -> FipsDoc | None:
         async with aiohttp.ClientSession() as session:
             async with session.get(
-                self.api_url + "docs/" + id_date, headers=self._headers
+                self.api_url + "docs/" + id_date, headers=self._headers, timeout=5
             ) as res:
                 try:
                     return FipsDoc(await res.json())
@@ -167,10 +228,13 @@ class FipsAPI(LoaderBase):
         return await self.get_doc_by_id_date(doc.get("id", "no_id"))
 
     async def find_relevant_by_keywords(
-        self, kws: list[str], num_of_docs=20, offset=0
+        self, kws: list[str], num_of_docs=20, offset=0, timeout: int = 30
     ) -> list[str]:
         res = await self._search_query(
-            q=" OR ".join(compress(kws, kws)), offset=offset, limit=num_of_docs
+            q=" OR ".join(compress(kws, kws)),
+            offset=offset,
+            limit=num_of_docs,
+            timeout=timeout,
         )
 
         if error := res.get("error"):
@@ -187,30 +251,23 @@ class FipsAPI(LoaderBase):
 class XMLDoc(DocumentBase):
     def extract_citaions(text: str) -> list[str]:
         # Регулярное выражение для патентной заявки
-        pattern = (
-            r"\b[A-Z]{2} ?\d+ ?[A-ZА-Я]\d?, ?\d{2,4}[ .,/\\-]\d{2}[ .,/\\-]\d{2,4}\b"
-        )
+        pattern = r"\b([A-Z]{2}) ?(?:\d{2,4}[/\\])?(\d+),? ?\n?([A-ZА-Я]\d?)?,? ?(\d{2,4})[ .,/\-](\d{2})[ .,/\-](\d{2,4})\b"
+
+        delete_pattern = r"(кл. |\n)"
+        text = re.sub(delete_pattern, "", text)
+        text = text.replace("Авторское свидетельство СССР N", "SU")
 
         # Найти все патентные документы в строке
         matches = re.findall(pattern, text)
+
         out = []
         for match in matches:
-            id_date = match.split(", ")
-            if len(id_date) == 1:
-                id_date = match.split(",")
+            date = match[-3:]
+            if len(match[-1]) == 4:
+                date = date[::-1]
+            date = "".join(date)
 
-            if len(id_date) < 2:
-                continue
-
-            id = re.sub(r"[^0-9a-zA-Zа-яА-Я]", "", id_date[0])
-            date = " ".join(id_date[1:])
-
-            dates = re.findall(r"\d+", date)
-
-            if len(dates[2]) == 4:
-                dates = dates[::-1]
-
-            date = "".join(dates)
+            id = "".join(match[:3])
 
             out.append(id + "_" + date)
         return out
@@ -438,7 +495,7 @@ class InternalESAPI(LoaderBase):
         Elasticsearch(hosts=hosts).close()
 
     async def find_relevant_by_keywords(
-        self, kws: list[str], num_of_docs=20, offset=0
+        self, kws: list[str], num_of_docs=20, offset=0, timeout: int = 30
     ) -> list[str]:
         _source_includes = [
             "common.document_number",
@@ -468,7 +525,7 @@ class InternalESAPI(LoaderBase):
             index=self.index,
             body=query,
             _source_includes=_source_includes,
-            request_timeout=15,
+            request_timeout=timeout,
             size=num_of_docs,
             from_=offset,
         )
@@ -548,7 +605,8 @@ class InternalESAPI(LoaderBase):
             index=self.index,
             body=query,
             _source_includes=_source_includes,
-            request_timeout=15,
+            size=3,
+            request_timeout=5,
         )
 
         res = res["hits"]["hits"]
@@ -577,7 +635,7 @@ class InternalESAPI(LoaderBase):
                     id=id_date,
                     index=index,
                     _source_includes=_source_includes,
-                    request_timeout=15,
+                    request_timeout=5,
                 )
                 return FipsDoc(res["_source"])
             except NotFoundError as ex:

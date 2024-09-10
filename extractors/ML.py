@@ -139,7 +139,12 @@ class KeyBERTExtractor(KeyWordExtractorBase):
         )
 
     def get_keywords(
-        self, doc: DocumentBase, num=50, use_mmr=True, diversity=0.7, **kwargs
+        self,
+        doc: DocumentBase,
+        num: int = 50,
+        use_mmr: bool = True,
+        diversity: float = 0.7,
+        **kwargs,
     ) -> list[str]:
         text = self.text_extraction_func(doc)
 

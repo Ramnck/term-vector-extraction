@@ -46,16 +46,16 @@ async def main(
             logger.error("File %s not found" % path_of_file.name)
             continue
 
-        relevant = await test_different_vectors(
-            data["keywords"],
-            ["expand", "mix", "shuffle", "raw"],
-            list(range(75, 401, 25)),
-            api,
-        )
+        # relevant = await test_different_vectors(
+        #     data["keywords"],
+        #     ["expand", "mix", "shuffle", "raw"],
+        #     list(range(75, 401, 25)),
+        #     api,
+        #     num_of_workers=None
+        # )
 
-        # keywords = {k: v[0] for k, v in data["keywords"].items()}
-
-        # relevant = await get_relevant(keywords, api)
+        keywords = {k: v[0] for k, v in data["keywords"].items()}
+        relevant = await get_relevant(keywords, api)
 
         data["relevant"] = relevant
 

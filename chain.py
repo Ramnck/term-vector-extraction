@@ -61,11 +61,27 @@ class ForgivingTaskGroup(asyncio.TaskGroup):
 async def get_cluster_from_document(
     doc: DocumentBase, api: LoaderBase
 ) -> list[DocumentBase]:
+
+    sub_docs_futures = []
+
+    try:
+        async with ForgivingTaskGroup() as tg:
+            for sub_doc_id_date in doc.cluster[1:]:
+                sub_docs_futures.append(
+                    tg.create_task(api.get_doc(sub_doc_id_date, timeout=60))
+                )
+    except* Exception as exs:
+        for ex in exs.exceptions:
+            logger.error("Exception in get_cluster_from_document - %s" % str(type(ex)))
+
     sub_docs = []
-    async with ForgivingTaskGroup() as tg:
-        for sub_doc_id_date in doc.cluster[1:]:
-            sub_docs.append(tg.create_task(api.get_doc(sub_doc_id_date)))
-    sub_docs = [i.result() for i in sub_docs if i.result() is not None]
+
+    for future in sub_docs_futures:
+        try:
+            if future.result() is not None:
+                sub_docs.append(future.result())
+        except:
+            pass
     sub_docs = [doc] + sub_docs
 
     logger.debug(f"Total {len(sub_docs)} documents")
@@ -75,14 +91,25 @@ async def get_cluster_from_document(
 
 def batched(iterable, n=1):
     l = len(iterable)
-    for ndx in range(0, l, n):
-        yield iterable[ndx : min(ndx + n, l)]
+
+    iterator = iter(iterable)
+    batch = []
+    try:
+        while True:
+            batch = []
+            for _ in range(n):
+                batch.append(next(iterator))
+            yield batch
+    except StopIteration:
+        if batch:
+            yield batch
 
 
 async def extract_keywords_from_docs(
     docs: DocumentBase | list[DocumentBase] | None,
     extractors: list[KeyWordExtractorBase],
     performance: dict | None = None,
+    num_of_keywords: int = 50,
 ) -> dict[str, list[list[str]]]:
     kws = {}
 
@@ -101,7 +128,7 @@ async def extract_keywords_from_docs(
             for doc in docs:
                 if doc is not None:
                     t = time.time()
-                    kw = ex.get_keywords(doc)
+                    kw = ex.get_keywords(doc, num=num_of_keywords)
                     if len(kw) > 2:
                         tmp_kws.append(kw)
                         if performance is not None:
@@ -124,7 +151,7 @@ async def get_relevant(
     async with ForgivingTaskGroup() as tg:
         for extractor_name, kw in keywords.items():
             relevant[extractor_name] = tg.create_task(
-                api.find_relevant_by_keywords(kw, num_of_docs=30)
+                api.find_relevant_by_keywords(kw, num_of_docs=30, timeout=90)
             )
 
     relevant = {k: v.result() for k, v in relevant.items()}
@@ -166,6 +193,7 @@ async def test_different_vectors(
     lens_of_vec: list[int],
     api: LoaderBase,
     num_of_workers: int | None = None,
+    timeout: int = 30,
 ) -> dict[str, list[str]]:
 
     relevant = {}
@@ -197,10 +225,10 @@ async def test_different_vectors(
                             term_vec_vec_copy, length=len_of_vec
                         )
                     elif method == "raw":
-                        term_vec = term_vec_vec[0]
+                        term_vec = term_vec_vec[0][:len_of_vec]
 
                     relevant[name] = tg.create_task(
-                        api.find_relevant_by_keywords(term_vec, 35)
+                        api.find_relevant_by_keywords(term_vec, 35, timeout=timeout)
                     )
 
         except* Exception as exs:
