@@ -14,6 +14,7 @@ from elasticsearch7 import AsyncElasticsearch, Elasticsearch, NotFoundError
 
 from api import DocumentBase, LoaderBase
 from lexis import extract_number
+from utils import ForgivingTaskGroup
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -464,11 +465,20 @@ class FileSystem(LoaderBase):
 
 
 class InternalESAPI(LoaderBase):
-    def __init__(self, ip: str | None) -> None:
-        if ip is None:
+    def __init__(
+        self,
+        elastic_ip: str | None,
+        doc_api_url: str | None = None,
+        doc_api_key: str | None = None,
+    ) -> None:
+        if elastic_ip is None:
             raise ValueError("ElasticSearch Url not specified")
-        Elasticsearch(hosts=[ip]).close()
-        self.es = AsyncElasticsearch(hosts=[ip])
+        Elasticsearch(hosts=[elastic_ip]).close()
+
+        self.doc_api_url = doc_api_url
+        self.doc_api_key = doc_api_key
+
+        self.es = AsyncElasticsearch(hosts=[elastic_ip])
         self.index = ["july24_ru", "may22_us", "may22_de", "may22_kr", "may22_ep"]
         self.languages = ["ja", "fr", "ru", "it", "de", "en", "ko", "es"]
         self.fields_without_languages = [
@@ -493,6 +503,55 @@ class InternalESAPI(LoaderBase):
         hosts = self.es.transport.hosts
         del self.es
         Elasticsearch(hosts=hosts).close()
+
+    async def get_document_list_from_range(
+        self,
+        from_date: str,
+        to_date: str,
+        take_every: int = 100,
+        kind: str = "(A1 or B2)",
+        timeout: int = 60 * 2,
+    ) -> list[str]:
+
+        url = self.document_api_url + "/API/query/"
+
+        data = {
+            "DP1": from_date,
+            "DP2": to_date,
+            "KI": kind,
+            "TakeXpart": take_every,
+            "freetext": "",
+        }
+
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": self.doc_api_key,
+        }
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                url=url, data=data, timeout=timeout, headers=headers
+            ) as res:
+                out = await res.json()
+                return out.get("IDs", [])
+
+    # async def get_cluster_from_document(self, doc: str | DocumentBase, timeout: int = 60 * 2) -> list[XMLDoc]:
+    #     if isinstance(doc, str):
+    #         doc_id = doc
+    #         doc = None
+    #     elif isinstance(doc, DocumentBase):
+    #         doc_id = doc.id_date
+
+    #     url = self.document_api_url + "/API/" + doc_id
+
+    #     headers = {"Authorization": self.doc_api_key}
+
+    #     async with aiohttp.ClientSession() as session:
+    #         async with session.get(url=url, timeout=timeout, headers=headers) as res:
+    #             out = await res.json()
+    #             cluster = out.get("luster", [])
+
+    #     async with
 
     async def find_relevant_by_keywords(
         self, kws: list[str], num_of_docs=20, offset=0, timeout: int = 30

@@ -1,5 +1,3 @@
-import asyncio
-import json
 import logging
 import os
 import random
@@ -9,8 +7,6 @@ import time
 from itertools import product
 from pathlib import Path
 
-import aiofiles
-import numpy as np
 from dotenv import load_dotenv
 
 from api import DocumentBase, KeyWordExtractorBase, LoaderBase
@@ -20,6 +16,7 @@ from lexis import (
     lemmatize_ru_word,
     make_extended_term_vec,
 )
+from utils import ForgivingTaskGroup, batched
 
 name = [Path(sys.argv[0]).name] + sys.argv[1:]
 filename = " ".join(name)
@@ -54,10 +51,6 @@ if FIPS_API_KEY is None:
     exit(1)
 
 
-class ForgivingTaskGroup(asyncio.TaskGroup):
-    _abort = lambda self: None
-
-
 async def get_cluster_from_document(
     doc: DocumentBase, api: LoaderBase
 ) -> list[DocumentBase]:
@@ -87,22 +80,6 @@ async def get_cluster_from_document(
     logger.debug(f"Total {len(sub_docs)} documents")
 
     return sub_docs
-
-
-def batched(iterable, n=1):
-    l = len(iterable)
-
-    iterator = iter(iterable)
-    batch = []
-    try:
-        while True:
-            batch = []
-            for _ in range(n):
-                batch.append(next(iterator))
-            yield batch
-    except StopIteration:
-        if batch:
-            yield batch
 
 
 async def extract_keywords_from_docs(
@@ -157,34 +134,6 @@ async def get_relevant(
     relevant = {k: v.result() for k, v in relevant.items()}
 
     return relevant
-
-
-async def save_data_to_json(
-    obj: dict | list, path_of_file: Path
-) -> bool:  # False on success
-    try:
-        async with aiofiles.open(
-            path_of_file,
-            "w+",
-            encoding="utf-8",
-        ) as file:
-            await file.write(json.dumps(obj, ensure_ascii=False, indent=4))
-        return False
-    except FileNotFoundError:
-        return True
-
-
-async def load_data_from_json(path_of_file: Path) -> dict | None:
-    try:
-        async with aiofiles.open(
-            path_of_file,
-            "r",
-            encoding="utf-8",
-        ) as file:
-            data = json.loads(await file.read())
-        return data
-    except FileNotFoundError:
-        return None
 
 
 async def test_different_vectors(

@@ -18,16 +18,13 @@ from chain import (
     BASE_DATA_PATH,
     ES_URL,
     FIPS_API_KEY,
-    ForgivingTaskGroup,
-    batched,
     extract_keywords_from_docs,
     get_cluster_from_document,
     get_relevant,
-    load_data_from_json,
-    save_data_to_json,
     test_different_vectors,
 )
 from documents import FileSystem, FipsAPI, InternalESAPI
+from utils import ForgivingTaskGroup, batched, load_data_from_json, save_data_to_json
 
 logger = logging.getLogger(__name__)
 

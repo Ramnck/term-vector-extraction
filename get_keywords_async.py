@@ -23,13 +23,9 @@ from chain import (
     BASE_DATA_PATH,
     ES_URL,
     FIPS_API_KEY,
-    ForgivingTaskGroup,
-    batched,
     extract_keywords_from_docs,
     get_cluster_from_document,
     get_relevant,
-    load_data_from_json,
-    save_data_to_json,
     test_different_vectors,
 )
 from documents import BlankDoc, FileSystem, FipsAPI
@@ -45,6 +41,7 @@ from lexis import (
     lemmatize_ru_word,
     make_extended_term_vec,
 )
+from utils import ForgivingTaskGroup, batched, load_data_from_json, save_data_to_json
 
 load_dotenv()
 
