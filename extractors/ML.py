@@ -1,16 +1,97 @@
-from typing import Any
+from operator import itemgetter
+from typing import Any, Callable, List, Tuple
 
 import numpy as np
 import torch
 from keybert import KeyBERT
-from keybert._maxsum import max_sum_distance
-from keybert._mmr import mmr
-from sklearn.feature_extraction.text import CountVectorizer
+from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
-from transformers import LongformerModel, LongformerTokenizerFast
+from transformers import (
+    AutoModel,
+    AutoTokenizer,
+    LongformerModel,
+    LongformerTokenizerFast,
+)
 
 from api import DocumentBase, EmbedderBase, KeyWordExtractorBase
-from lexis import clean_ru_text, lemmatize_doc, stopwords_ru
+from lexis import clean_ru_text, lemmatize_doc, stopwords_ru_en
+
+
+def mmr(
+    doc_embedding: np.ndarray,
+    word_embeddings: np.ndarray,
+    words: List[str],
+    top_n: int = 5,
+    diversity: float = 0.8,
+) -> List[Tuple[str, float]]:
+    """Calculate Maximal Marginal Relevance (MMR)
+    between candidate keywords and the document.
+
+
+    MMR considers the similarity of keywords/keyphrases with the
+    document, along with the similarity of already selected
+    keywords and keyphrases. This results in a selection of keywords
+    that maximize their within diversity with respect to the document.
+
+    Arguments:
+        doc_embedding: The document embeddings
+        word_embeddings: The embeddings of the selected candidate keywords/phrases
+        words: The selected candidate keywords/keyphrases
+        top_n: The number of keywords/keyhprases to return
+        diversity: How diverse the select keywords/keyphrases are.
+                   Values between 0 and 1 with 0 being not diverse at all
+                   and 1 being most diverse.
+
+    Returns:
+         List[Tuple[str, float]]: The selected keywords/keyphrases with their distances
+
+    """
+
+    # Extract similarity within words, and between words and the document
+    word_doc_similarity = cosine_similarity(word_embeddings, doc_embedding)
+    word_similarity = cosine_similarity(word_embeddings)
+
+    # Initialize candidates and already choose best keyword/keyphras
+    keywords_idx = [np.argmax(word_doc_similarity)]
+    candidates_idx = [i for i in range(len(words)) if i != keywords_idx[0]]
+
+    for _ in range(min(top_n - 1, len(words) - 1)):
+        # Extract similarities within candidates and
+        # between candidates and selected keywords/phrases
+        candidate_similarities = word_doc_similarity[candidates_idx, :]
+        target_similarities = np.max(
+            word_similarity[candidates_idx][:, keywords_idx], axis=1
+        )
+
+        # Calculate MMR
+        mmr = (
+            1 - diversity
+        ) * candidate_similarities - diversity * target_similarities.reshape(-1, 1)
+        mmr_idx = candidates_idx[np.argmax(mmr)]
+
+        # Update keywords & candidates
+        keywords_idx.append(mmr_idx)
+        candidates_idx.remove(mmr_idx)
+
+    # Extract and sort keywords in descending similarity
+    keywords = [
+        (words[idx], round(float(word_doc_similarity.reshape(1, -1)[0][idx]), 4))
+        for idx in keywords_idx
+    ]
+    keywords = sorted(keywords, key=itemgetter(1), reverse=True)
+    return keywords
+
+
+def mean_pooling(model_output, attention_mask):
+    token_embeddings = model_output[
+        0
+    ]  # First element of model_output contains all token embeddings
+    input_mask_expanded = (
+        attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
+    )
+    sum_embeddings = torch.sum(token_embeddings * input_mask_expanded, 1)
+    sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-9)
+    return sum_embeddings / sum_mask
 
 
 class RuLongrormerEmbedder(EmbedderBase):
@@ -21,9 +102,9 @@ class RuLongrormerEmbedder(EmbedderBase):
         self.model = LongformerModel.from_pretrained(model)
         self.tokenizer = LongformerTokenizerFast.from_pretrained(model)
 
-    def embed(self, documents: list[str], **kwargs) -> np.ndarray:
+    def encode(self, documents: list[str], **kwargs) -> np.ndarray:
         device = "cuda"
-        self.model.to(device)
+        model = self.model.to(device)
 
         batches = [
             self.tokenizer(document, return_tensors="pt") for document in documents
@@ -44,7 +125,7 @@ class RuLongrormerEmbedder(EmbedderBase):
             batch["global_attention_mask"] = torch.tensor(global_attention_mask)
 
             with torch.no_grad():
-                output = self.model(**batch.to(device))
+                output = model(**batch.to(device))
             tensor = output.last_hidden_state[:, 0, :].cpu()
             outputs.append(tensor)
 
@@ -53,28 +134,62 @@ class RuLongrormerEmbedder(EmbedderBase):
         return np.array(outputs)
 
 
+class TransformerEmbedder(EmbedderBase):
+    def __init__(self, model, pooling_func: Callable = mean_pooling, device="cuda"):
+        self.model = AutoModel.from_pretrained(model)
+        self.tokenizer = AutoTokenizer.from_pretrained(model)
+        self.pooling_func = pooling_func
+        self.device = device
+
+    def encode(self, documents: list[str], **kwargs) -> np.ndarray:
+        encoded_input = self.tokenizer(
+            documents, padding=True, truncation=True, max_length=24, return_tensors="pt"
+        )
+
+        model = self.model.to(self.device)
+
+        with torch.no_grad():
+            model_output = model(**encoded_input.to(self.device))
+
+        # Perform pooling. In this case, mean pooling
+        sentence_embeddings = self.pooling_func(
+            model_output, encoded_input["attention_mask"]
+        )
+        return sentence_embeddings.cpu().numpy()
+
+
 class KeyBERTModel:
     def __init__(
         self,
-        doc_embedder: EmbedderBase,
-        word_embedder: EmbedderBase | None = None,
+        doc_embedder: EmbedderBase | SentenceTransformer,
+        word_embedder: EmbedderBase | SentenceTransformer | None = None,
+        doc_prefix: str = "",
+        word_prefix: str = "",
+        **kwargs,
     ) -> None:
+
+        self.doc_prefix = doc_prefix
+        self.word_prefix = word_prefix
+
         self.word_embedder = (
             word_embedder if word_embedder is not None else doc_embedder
         )
         self.doc_embedder = doc_embedder
+        self.encode_kwargs = {"show_progress_bar": False}
 
     def extract_doc_embedding(self, doc: str) -> list[list[float]]:
-        return self.doc_embedder.embed([doc])
+        return self.doc_embedder.encode([self.doc_prefix + doc], **self.encode_kwargs)
 
-    def extract_word_embeddings(self, words: list[str]) -> list[list[float]]:
-        return self.word_embedder.embed(words)
+    def extract_word_embedding(self, words: list[str]) -> list[float]:
+        return self.word_embedder.encode(
+            [self.word_prefix + word for word in words], **self.encode_kwargs
+        )
 
     def extract_keywords(
         self,
         document: str,
         top_n: int = 50,
-        use_mmr: bool = False,
+        use_mmr: bool = True,
         diversity: float = 0.7,
         nr_candidates: int = 20,
         **kwargs,
@@ -93,13 +208,11 @@ class KeyBERTModel:
                      selection of keywords/keyphrases.
         """
 
-        # add vectorizer
-
-        lemmatized_text = lemmatize_doc(document, stopwords_ru)
+        lemmatized_text = lemmatize_doc(document, stopwords_ru_en)
 
         words = [word for word in set(lemmatized_text) if word]
 
-        word_embeddings = self.extract_word_embeddings(words)
+        word_embeddings = self.extract_word_embedding(words)
         doc_embedding = self.extract_doc_embedding(document)
 
         # Maximal Marginal Relevance (MMR)
@@ -125,15 +238,30 @@ class KeyBERTModel:
 class KeyBERTExtractor(KeyWordExtractorBase):
     def __init__(
         self,
-        model: str | KeyBERTModel | Any,
+        model: str | KeyBERTModel | Any | SentenceTransformer,
         method_name: str = "KBRT",
+        text_extraction_func: Callable[[DocumentBase], str] = lambda doc: doc.text,
+        doc_prefix: str = "",
+        word_prefix: str = "",
         **kwargs,
     ) -> None:
         self.method_name = method_name
         if isinstance(model, KeyBERTModel):
             self.model = model
+        elif isinstance(model, SentenceTransformer):
+            self.model = KeyBERTModel(
+                model, doc_prefix=doc_prefix, word_prefix=word_prefix
+            )
+        elif isinstance(model, EmbedderBase):
+            self.model = KeyBERTModel(
+                model, doc_prefix=doc_prefix, word_prefix=word_prefix
+            )
         else:
-            self.model = KeyBERT(model)
+            raise RuntimeError("Error in parsing model")
+
+        self.doc_prefix = doc_prefix
+        self.word_prefix = word_prefix
+
         self.text_extraction_func = kwargs.get(
             "text_extraction_func", lambda doc: doc.text
         )
@@ -146,6 +274,7 @@ class KeyBERTExtractor(KeyWordExtractorBase):
         diversity: float = 0.7,
         **kwargs,
     ) -> list[str]:
+
         text = self.text_extraction_func(doc)
 
         out = self.model.extract_keywords(

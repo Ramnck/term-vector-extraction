@@ -12,7 +12,8 @@ morph = MorphAnalyzer()
 
 
 def extract_number(text: str) -> str:
-    return re.findall(r"\d+", text)[0]
+    m = re.search(r"\d+", text.replace("/", ""))
+    return m.group() if m else ""
 
 
 def clean_ru_text(text) -> str:
@@ -31,17 +32,21 @@ with open(Path("data") / "SimilarStopWords.txt", encoding="utf-8") as file:
 with open(Path("data") / "MyStopWords.txt", encoding="utf-8") as file:
     stopwords_my = [i.strip() for i in file]
 stopwords_nltk_ru = list(nltk.corpus.stopwords.words("russian"))
-stopwords_nltk_en = list(nltk.corpus.stopwords.words("english"))
+stopwords_ru = list(set(chain(stopwords_my, stopwords_nltk_ru, stopwords_iteco)))
 
-stopwords_ru = set()
-stopwords_ru |= set(stopwords_nltk_en)
-for word in chain(stopwords_my, stopwords_nltk_ru, stopwords_iteco):
-    stopwords_ru.add(lemmatize_ru_word(word))
-stopwords_ru = list(stopwords_ru)
+
+stopwords_nltk_en = list(nltk.corpus.stopwords.words("english"))
+stopwords_en = list(set(stopwords_nltk_en))
+
+stopwords_ru_en = set()
+stopwords_ru_en |= set(stopwords_ru)
+stopwords_ru_en |= set(stopwords_en)
+
+stopwords_ru_en = list(stopwords_ru_en)
 
 
 def lemmatize_doc(
-    doc: str | list[str], stopwords: list[str] = stopwords_ru
+    doc: str | list[str], stopwords: list[str] = stopwords_ru_en
 ) -> list[str]:
     tokens = []
 
@@ -49,7 +54,7 @@ def lemmatize_doc(
         doc = doc.split()
 
     for token in doc:
-        token = "".join(re.findall(r"[А-Яа-яA-Za-z0-9-]+", token.strip("-")))
+        token = "".join(re.findall(r"[А-Яа-яA-Za-z-]+", token.strip("-")))
         if token:
             token = lemmatize_ru_word(token)
             if token not in stopwords:

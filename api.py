@@ -7,8 +7,15 @@ class DocumentBase(ABC):
     def __init__(self) -> None:
         raise NotImplementedError
 
+    def __str__(self) -> str:
+        raise self.text
+
     @property
     def citations(self) -> list[str]:
+        raise NotImplementedError
+
+    @property
+    def cluster(self) -> list[str]:
         raise NotImplementedError
 
     @property
@@ -65,3 +72,14 @@ class EmbedderBase(ABC):
 
     def embed(self, documents: list[str], **kwargs) -> np.ndarray:
         raise NotImplementedError
+
+
+class TranslatorBase(ABC):
+    def __init__(self, *args, **kwargs) -> None:
+        raise NotImplementedError
+
+    def translate(self, words: list[str], **kwargs) -> list[str]:
+        raise NotImplementedError
+
+    def get_name(self) -> str:
+        return "NOT_IMPL"

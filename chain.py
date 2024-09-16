@@ -52,7 +52,7 @@ if FIPS_API_KEY is None:
 
 
 async def get_cluster_from_document(
-    doc: DocumentBase, api: LoaderBase
+    doc: DocumentBase, api: LoaderBase, timeout: int = 60
 ) -> list[DocumentBase]:
 
     sub_docs_futures = []
@@ -61,7 +61,7 @@ async def get_cluster_from_document(
         async with ForgivingTaskGroup() as tg:
             for sub_doc_id_date in doc.cluster[1:]:
                 sub_docs_futures.append(
-                    tg.create_task(api.get_doc(sub_doc_id_date, timeout=60))
+                    tg.create_task(api.get_doc(sub_doc_id_date, timeout=timeout))
                 )
     except* Exception as exs:
         for ex in exs.exceptions:

@@ -25,12 +25,19 @@ rand_terms = "ракета машина смазка установка само
 
 
 class BlankDoc(DocumentBase):
-    def __init__(self) -> None:
-        self._text = None
-        self._citations = None
-        self._cluster = None
-        self._id = None
-        self._date = None
+    def __init__(self, base_doc: DocumentBase | None = None) -> None:
+        if base_doc is None:
+            self._text = None
+            self._citations = None
+            self._cluster = None
+            self._id = None
+            self._date = None
+        else:
+            self._text = base_doc.text
+            self._citations = base_doc.citations
+            self._cluster = base_doc.cluster
+            self._id = base_doc.id
+            self._date = base_doc.date
 
     @property
     def text(self) -> str:
@@ -76,6 +83,10 @@ class BlankDoc(DocumentBase):
 class FipsDoc(DocumentBase):
     def __init__(self, raw) -> None:
         self.raw_json = raw
+
+    @property
+    def cluster(self) -> list[str]:
+        return [self.id_date]
 
     @property
     def citations(self) -> list[str]:
@@ -183,15 +194,15 @@ class FipsAPI(LoaderBase):
                     return {}
 
     async def get_doc(self, id: str, timeout: int = 10) -> FipsDoc | None:
-        pub_office = id[:2]
+        pub_office = re.search(r"[A-Z]{2}", id)
         num_of_doc = extract_number(id).lstrip("0")
 
-        res = await self._search_query(
-            q=f"PN={num_of_doc}",
-            filter={"country": {"values": [pub_office]}},
-            timeout=timeout,
-            limit=3,
-        )
+        request = {"q": f"PN={num_of_doc}", "timeout": timeout, "limit": 3}
+
+        if pub_office is not None:
+            request["filter"] = {"country": {"values": [pub_office.group()]}}
+
+        res = await self._search_query(**request)
 
         if error := res.get("error"):
             logger.error(error)
@@ -285,7 +296,7 @@ class XMLDoc(DocumentBase):
             self.xml_obj = ET.fromstring(raw)
 
     @property
-    def _raw_citations_field(self) -> str:
+    def _freeformat_citations_field(self) -> str:
         tag = self.xml_obj.find(XMLDoc.Namespace.pat + "BibliographicData")
         tag = tag.find(XMLDoc.Namespace.pat + "ReferenceCitationBag")
         refs = []
@@ -303,9 +314,50 @@ class XMLDoc(DocumentBase):
 
     @property
     def citations(self) -> list[str]:
-        citations = self._raw_citations_field
+        citations_free = self._freeformat_citations_field
 
-        return XMLDoc.extract_citaions(citations)
+        citations = XMLDoc.extract_citaions(citations_free)
+
+        if len(citations) == 0:
+            tag = self.xml_obj.find(XMLDoc.Namespace.pat + "BibliographicData")
+            tag = tag.find(XMLDoc.Namespace.pat + "ReferenceCitationBag")
+            if tag is not None:
+                for ref_cite in tag.findall(XMLDoc.Namespace.pat + "ReferenceCitation"):
+                    pat_cite = ref_cite.find(XMLDoc.Namespace.com + "PatentCitation")
+                    if pat_cite is not None:
+                        cited_doc_id = pat_cite.find(
+                            XMLDoc.Namespace.com + "CitedPatentDocumentIdentification"
+                        )
+                        if cited_doc_id is not None:
+                            pat_off = cited_doc_id.find(
+                                XMLDoc.Namespace.com + "IPOfficeCode"
+                            )
+                            doc_num = cited_doc_id.find(
+                                XMLDoc.Namespace.com + "DocumentNumber"
+                            )
+                            kind = cited_doc_id.find(
+                                XMLDoc.Namespace.com + "PatentDocumentKindCode"
+                            )
+                            date = cited_doc_id.find(
+                                XMLDoc.Namespace.com + "PatentDocumentDate"
+                            )
+
+                            if (
+                                pat_off is not None
+                                and doc_num is not None
+                                and kind is not None
+                                and date is not None
+                            ):
+                                cite_id = (
+                                    pat_off.text
+                                    + doc_num.text
+                                    + kind.text
+                                    + "_"
+                                    + date.text
+                                )
+                                citations.append(cite_id)
+
+        return citations
 
     @property
     def description(self) -> str:
@@ -430,12 +482,15 @@ class FileSystem(LoaderBase):
         return doc
 
     async def get_doc(self, id_date: str) -> XMLDoc | None:
-        num_of_doc = re.findall(r"\d+", id_date)[0].lstrip("0")
-        for file_path in self.init_path.iterdir():
-            if file_path.is_dir():
-                file_path = next(iter(file_path.iterdir()))
-            if num_of_doc in str(file_path):
-                return await self._open_file(file_path)
+        # num_of_doc = extract_number(id_date).lstrip("0")
+        for path in self.init_path.iterdir():
+            if path.is_dir():
+                file_paths = list(path.iterdir())
+            elif path.is_file():
+                file_paths = [path]
+            for file_path in file_paths:
+                if id_date in file_path.stem:
+                    return await self._open_file(file_path)
         logger.error(id_date + " document not found")
         return None
 
