@@ -1,14 +1,48 @@
 import re
-from itertools import chain, cycle
+from itertools import chain, compress, cycle
 from pathlib import Path
 from typing import Callable
 
+import nltk
 import nltk.corpus
 from pymorphy3 import MorphAnalyzer
 
 from api import DocumentBase
 
 morph = MorphAnalyzer()
+
+
+def pos_tags_ru(word: str, simplify: bool = False) -> list[str]:
+    tags = [i.tag.POS for i in morph.parse(word)]
+    if simplify:
+        simplify_dict = {
+            "NOUN": "NOUN",
+            "ADJF": "ADJ",
+            "ADJS": "ADJ",
+            "COMP": "ADJ",
+            "PRTF": "ADJ",
+            "PRTS": "ADJ",
+            "VERB": "VERB",
+            "INFN": "VERB",
+            "GRND": "VERB",
+            "ADVB": "ADV",
+        }
+        for tag in tags:
+            tag = simplify_dict.get(tag, "")
+        tags = list(compress(tags, tags))
+    tags = list(dict.fromkeys(tags))
+    return tags
+
+
+def pos_tag_en(word: str, simplify: bool = False) -> str:
+    tag = nltk.pos_tag([word], tagset="universal")[0][1]
+    if tag == "X":
+        tag = "NOUN"
+    if simplify:
+        simplify_list = ["ADJ", "ADV", "NOUN", "VERB"]
+        if tag not in simplify_list:
+            tag = ""
+    return tag
 
 
 def extract_number(text: str) -> str:

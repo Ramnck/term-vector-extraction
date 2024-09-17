@@ -590,23 +590,24 @@ class InternalESAPI(LoaderBase):
                 out = await res.json()
                 return out.get("IDs", [])
 
-    # async def get_cluster_from_document(self, doc: str | DocumentBase, timeout: int = 60 * 2) -> list[XMLDoc]:
-    #     if isinstance(doc, str):
-    #         doc_id = doc
-    #         doc = None
-    #     elif isinstance(doc, DocumentBase):
-    #         doc_id = doc.id_date
+        # async def get_cluster_from_document(self, doc: str | DocumentBase, timeout: int = 60 * 2) -> list[XMLDoc]:
+        #     if isinstance(doc, str):
+        #         doc_id = doc
+        #         doc = None
+        #     elif isinstance(doc, DocumentBase):
+        #         doc_id = doc.id_date
 
-    #     url = self.document_api_url + "/API/" + doc_id
+        #     url = self.document_api_url + "/API/" + doc_id
 
-    #     headers = {"Authorization": self.doc_api_key}
+        #     headers = {"Authorization": self.doc_api_key}
 
-    #     async with aiohttp.ClientSession() as session:
-    #         async with session.get(url=url, timeout=timeout, headers=headers) as res:
-    #             out = await res.json()
-    #             cluster = out.get("luster", [])
+        #     async with aiohttp.ClientSession() as session:
+        #         async with session.get(url=url, timeout=timeout, headers=headers) as res:
+        #             out = await res.json()
+        #             cluster = out.get("luster", [])
 
-    #     async with
+        #     async with
+        pass
 
     async def find_relevant_by_keywords(
         self, kws: list[str], num_of_docs=20, offset=0, timeout: int = 30

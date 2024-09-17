@@ -49,25 +49,25 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 extractors = [
-    YAKExtractor(),
-    KeyBERTExtractor(
-        SentenceTransformer(
-            "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
-        ),
-        "mpnet",
-    ),
-    KeyBERTExtractor(
-        SentenceTransformer("intfloat/multilingual-e5-large"),
-        "e5-large",
-        doc_prefix="passage: ",
-        word_prefix="query: ",
-    ),
+    # YAKExtractor(),
     # KeyBERTExtractor(
-    #     SentenceTransformer("ai-forever/ru-en-RoSBERTa"),
-    #     "RoSBERTa",
-    #     doc_prefix="search_document: ",
-    #     word_prefix="search_query: ",
+    #     SentenceTransformer(
+    #         "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+    #     ),
+    #     "mpnet",
     # ),
+    # KeyBERTExtractor(
+    #     SentenceTransformer("intfloat/multilingual-e5-large"),
+    #     "e5-large",
+    #     doc_prefix="passage: ",
+    #     word_prefix="query: ",
+    # ),
+    KeyBERTExtractor(
+        SentenceTransformer("ai-forever/ru-en-RoSBERTa"),
+        "RoSBERTa",
+        doc_prefix="search_document: ",
+        word_prefix="search_query: ",
+    ),
     # KeyBERTExtractor(
     #     TransformerEmbedder("ai-forever/ruElectra-large"),
     #     "ruELECTRA",
@@ -145,6 +145,11 @@ async def process_path(
 
     doc = cluster[0]
 
+    if await load_data_from_json(
+        BASE_DATA_PATH / "eval" / name_of_experiment / (doc.id_date + ".json")
+    ):
+        return
+
     data = {
         "doc_id": doc.id_date,
         "56": doc.citations,
@@ -197,9 +202,9 @@ async def main(
     num_of_doc = 0
     # async for doc in tqdm_asyncio(aiter(loader), total=num_of_docs, desc="Progress"):
 
-    # docs = [doc async for doc in loader][:num_of_docs]
+    docs = [doc async for doc in loader][:num_of_docs]
 
-    docs = list((BASE_DATA_PATH / "raw" / input_path).iterdir())
+    # docs = list((BASE_DATA_PATH / "raw" / input_path).iterdir())
 
     for doc_batch in batched(docs, n=num_of_workers):
         async with ForgivingTaskGroup() as tg:

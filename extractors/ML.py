@@ -146,10 +146,11 @@ class TransformerEmbedder(EmbedderBase):
             documents, padding=True, truncation=True, max_length=24, return_tensors="pt"
         )
 
-        model = self.model.to(self.device)
+        if self.model.device.type != self.device:
+            self.model = self.model.to(self.device)
 
         with torch.no_grad():
-            model_output = model(**encoded_input.to(self.device))
+            model_output = self.model(**encoded_input.to(self.device))
 
         # Perform pooling. In this case, mean pooling
         sentence_embeddings = self.pooling_func(

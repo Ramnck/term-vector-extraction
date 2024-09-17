@@ -24,12 +24,12 @@ from chain import (
     test_different_vectors,
 )
 from documents import FileSystem, FipsAPI, InternalESAPI
-from extractors.translators import LLMTranslator, PROMTTranslator
+from extractors.translators.promt import PROMTTranslator
 from utils import ForgivingTaskGroup, batched, load_data_from_json, save_data_to_json
 
 translators = [
-    LLMTranslator(),
-    # PROMTTranslator()
+    # LLMTranslator(),
+    PROMTTranslator()
 ]
 
 logger = logging.getLogger(__name__)
@@ -47,9 +47,10 @@ async def process_document(data_dict: dict, dir_path: Path):
     new_keywords = {}
     for k, v in keywords.items():
         for translator in translators:
-            new_keywords[k + "_" + translator.get_name()] = (
-                v + await translator.translate(v)
-            )
+            data = await translator.translate(v)
+            for tr_name, tr in data.items():
+
+                new_keywords[k + "_" + translator.get_name() + "_" + tr_name] = v + tr
 
     data_dict["keywords"] = new_keywords
 
