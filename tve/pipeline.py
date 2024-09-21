@@ -4,7 +4,7 @@ import random
 import re
 import sys
 import time
-from itertools import product
+from itertools import compress, product
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -208,8 +208,8 @@ async def test_translation(
         product(data_keywords.items(), nums_of_translations, ["append", "replace"])
     )
 
-    if len(methods) < 7 * 4 * 2:
-        print("too few methods: %d" % len(methods))
+    # if len(methods) < 7 * 4 * 2:
+    # print("too few methods: %d" % len(methods))
 
     for (extractor_name, term_vec_vec), num, compose in methods:
         name = "_".join([extractor_name, str(num), compose])
@@ -223,9 +223,10 @@ async def test_translation(
             if len(trans) < 2:
                 logger.error("Empty translations list in %s" % name)
             for k, v in trans.items():
-                relevant[name + "_" + k] = await api.find_relevant_by_keywords(
-                    termvec + v
-                )
+                tv = termvec + v
+                tv = list(map(lambda x: "".join(re.findall(r"[A-Za-zа-яА-Я-]", x)), tv))
+                tv = compress(tv, tv)
+                relevant[name + "_" + k] = await api.find_relevant_by_keywords(tv)
 
         except Exception as ex:
             # for ex in exs.exceptions:

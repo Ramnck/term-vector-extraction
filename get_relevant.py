@@ -84,7 +84,7 @@ async def main(
                     # )
 
                     rel_coro = test_translation(
-                        data["keywords"], api, translator, range(1, 5), 1
+                        data["keywords"], api, translator, range(1, 4), 1
                     )
 
                     tg.create_task(
