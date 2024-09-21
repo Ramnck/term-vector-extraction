@@ -13,8 +13,9 @@ import numpy as np
 from tqdm import tqdm
 from tqdm.asyncio import tqdm_asyncio
 
-from api import LoaderBase
-from chain import (
+from tve.base import LoaderBase
+from tve.documents import FileSystem, FipsAPI, InternalESAPI
+from tve.pipeline import (
     BASE_DATA_PATH,
     ES_URL,
     FIPS_API_KEY,
@@ -23,9 +24,13 @@ from chain import (
     get_relevant,
     test_different_vectors,
 )
-from documents import FileSystem, FipsAPI, InternalESAPI
-from extractors.translators.promt import PROMTTranslator
-from utils import ForgivingTaskGroup, batched, load_data_from_json, save_data_to_json
+from tve.translators.promt import PROMTTranslator
+from tve.utils import (
+    ForgivingTaskGroup,
+    batched,
+    load_data_from_json,
+    save_data_to_json,
+)
 
 translators = [
     # LLMTranslator(),

@@ -13,8 +13,8 @@ from transformers import (
     LongformerTokenizerFast,
 )
 
-from api import DocumentBase, EmbedderBase, KeyWordExtractorBase
-from lexis import clean_ru_text, lemmatize_doc, stopwords_ru_en
+from ..base import DocumentBase, EmbedderBase, KeyWordExtractorBase
+from ..lexis import clean_ru_text, lemmatize_doc, stopwords_ru_en
 
 
 def mmr(
@@ -178,12 +178,14 @@ class KeyBERTModel:
         self.doc_embedder = doc_embedder
         self.encode_kwargs = {"show_progress_bar": False}
 
-    def extract_doc_embedding(self, doc: str) -> list[list[float]]:
-        return self.doc_embedder.encode([self.doc_prefix + doc], **self.encode_kwargs)
+    def extract_doc_embedding(self, doc: str, **kwargs) -> list[list[float]]:
+        kwargs.update(self.encode_kwargs)
+        return self.doc_embedder.encode([self.doc_prefix + doc], **kwargs)
 
-    def extract_word_embedding(self, words: list[str]) -> list[float]:
+    def extract_word_embedding(self, words: list[str], **kwargs) -> list[float]:
+        kwargs.update(self.encode_kwargs)
         return self.word_embedder.encode(
-            [self.word_prefix + word for word in words], **self.encode_kwargs
+            [self.word_prefix + word for word in words], **kwargs
         )
 
     def extract_keywords(
@@ -213,8 +215,12 @@ class KeyBERTModel:
 
         words = [word for word in set(lemmatized_text) if word]
 
-        word_embeddings = self.extract_word_embedding(words)
-        doc_embedding = self.extract_doc_embedding(document)
+        word_embeddings = self.extract_word_embedding(
+            words, **kwargs.get("word_embed_kwargs", {})
+        )
+        doc_embedding = self.extract_doc_embedding(
+            document, **kwargs.get("doc_embed_kwargs", {})
+        )
 
         # Maximal Marginal Relevance (MMR)
         if use_mmr:
@@ -263,9 +269,12 @@ class KeyBERTExtractor(KeyWordExtractorBase):
         self.doc_prefix = doc_prefix
         self.word_prefix = word_prefix
 
-        self.text_extraction_func = kwargs.get(
-            "text_extraction_func", lambda doc: doc.text
-        )
+        if "text_extraction_func" in kwargs.keys():
+            self.text_extraction_func = kwargs["text_extraction_func"]
+            del kwargs["text_extraction_func"]
+        else:
+            self.text_extraction_func = lambda doc: doc.text
+        self.kwargs = kwargs
 
     def get_keywords(
         self,
@@ -278,8 +287,10 @@ class KeyBERTExtractor(KeyWordExtractorBase):
 
         text = self.text_extraction_func(doc)
 
+        kwargs.update(self.kwargs)
+
         out = self.model.extract_keywords(
-            text, top_n=num, use_mmr=use_mmr, diversity=diversity
+            text, top_n=num, use_mmr=use_mmr, diversity=diversity, **kwargs
         )
 
         return [i[0] for i in out]

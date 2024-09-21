@@ -5,67 +5,99 @@ import logging
 import os
 import sys
 import time
+from itertools import product
 from pathlib import Path
 
 import aiofiles
 import numpy as np
+from tqdm import tqdm
 from tqdm.asyncio import tqdm_asyncio
 
-from api import LoaderBase
-from chain import (
+from tve.base import LoaderBase
+from tve.documents import FileSystem, FipsAPI, InternalESAPI
+from tve.pipeline import (
     BASE_DATA_PATH,
     ES_URL,
     FIPS_API_KEY,
+    PROMT_IP,
     extract_keywords_from_docs,
     get_cluster_from_document,
     get_relevant,
+    test_different_vectors,
+    test_translation,
+)
+from tve.translators.promt import PROMTTranslator
+from tve.utils import (
+    ForgivingTaskGroup,
+    batched,
     load_data_from_json,
     save_data_to_json,
-    test_different_vectors,
 )
-from documents import FileSystem, FipsAPI, InternalESAPI
 
 logger = logging.getLogger(__name__)
 
+translator = PROMTTranslator(PROMT_IP)
+
+
+async def process_document(relevant_coroutine, data_dict, dir_path):
+    relevant = await relevant_coroutine
+    data_dict["relevant"] = relevant
+
+    file_path = dir_path / (data_dict["doc_id"] + ".json")
+    if await save_data_to_json(data_dict, file_path):
+        raise RuntimeError("Error saving file %s" % file_path)
+
 
 async def main(
-    loader: LoaderBase,
     api: LoaderBase,
     num_of_docs: int | None,
     input_path: str,
     output_path: str | None,
+    num_of_workers: int,
 ):
 
-    num_of_doc = 0
-    async for doc in tqdm_asyncio(aiter(loader), total=num_of_docs, desc="Progress"):
-        num_of_doc += 1
+    dir_path = BASE_DATA_PATH / "eval" / input_path
 
-        path_of_file = BASE_DATA_PATH / "eval" / input_path / (doc.id_date + ".json")
-        data = await load_data_from_json(path_of_file)
-        if not data:
-            logger.error("File %s not found" % path_of_file.name)
-            continue
+    doc_paths = list(dir_path.iterdir())[:num_of_docs]
 
-        # relevant = await test_different_vectors(
-        #     data["keywords"],
-        #     ["expand", "mix", "shuffle", "raw"],
-        #     list(range(75, 401, 25)),
-        #     api,
-        #     num_of_workers=None
-        # )
+    methods = ["raw"]
+    lens_of_vec = [125, 150, 175, 200]
 
-        keywords = {k: v[0] for k, v in data["keywords"].items()}
-        relevant = await get_relevant(keywords, api)
+    progress_bar = tqdm(desc="Progress", total=num_of_docs)
 
-        data["relevant"] = relevant
+    for doc_path_batch in batched(doc_paths, n=num_of_workers):
+        try:
+            async with ForgivingTaskGroup() as tg:
 
-        path_of_file = BASE_DATA_PATH / "eval" / output_path / (doc.id_date + ".json")
-        if await save_data_to_json(data, path_of_file):
-            logger.error("Error occured while saving %s file" % path_of_file.name)
+                def new_on_task_done(task):
+                    asyncio.TaskGroup._on_task_done(tg, task)
+                    progress_bar.update(1)
 
-        if num_of_docs is not None:
-            if num_of_doc >= num_of_docs:
-                break
+                tg._on_task_done = new_on_task_done
+
+                for doc_path in doc_path_batch:
+
+                    data = await load_data_from_json(doc_path)
+
+                    # rel_coro = test_different_vectors(
+                    #     data["keywords"], methods, lens_of_vec, api, timeout=180
+                    # )
+
+                    rel_coro = test_translation(
+                        data["keywords"], api, translator, range(1, 5), 1
+                    )
+
+                    tg.create_task(
+                        process_document(
+                            rel_coro, data, BASE_DATA_PATH / "eval" / output_path
+                        )
+                    )
+
+        except* Exception as exs:
+            for ex in exs.exceptions:
+                logger.error("Exception in test_different - %s" % str(ex))
+
+    progress_bar.close()
 
 
 if __name__ == "__main__":
@@ -75,19 +107,14 @@ if __name__ == "__main__":
     )
     parser.add_argument("-i", "--input", default="80")
     parser.add_argument("-o", "--output", default="80_rel")
-    parser.add_argument(
-        "-d",
-        "--docs",
-        default="clusters",
-        help="Where to iterate over document id's (path to xmls)",
-    )
     parser.add_argument("-n", "--number", default=None, type=int)
+    parser.add_argument("-w", "--num-of-workers", default=50, type=int)
 
     args = parser.parse_args()
 
-    # api = FipsAPI(FIPS_API_KEY)
-    api = InternalESAPI(ES_URL)
-    loader = FileSystem(Path("data") / "raw" / args.docs)
+    api = FipsAPI(FIPS_API_KEY)
+    # api = InternalESAPI(ES_URL)
+    # loader = FileSystem(Path("data") / "raw" / args.docs)
 
-    coro = main(loader, api, args.number, args.input, args.output)
+    coro = main(api, args.number, args.input, args.output, args.num_of_workers)
     asyncio.run(coro)

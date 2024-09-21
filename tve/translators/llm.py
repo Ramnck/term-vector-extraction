@@ -6,9 +6,8 @@ import re
 
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = 0
 import aiohttp
+from base import TranslatorBase
 from llama_cpp import Llama
-
-from api import TranslatorBase
 from utils import ForgivingTaskGroup
 
 llm_llama = Llama(
@@ -30,7 +29,7 @@ class LLMTranslator(TranslatorBase):
         # self.llm = Llama(model_path=model_path, n_ctx=0, verbose=False, n_gpu_layers=-1)
         pass
 
-    async def translate(
+    async def translate_list(
         self, words: list[str], num_of_suggestions: int = 2, **kwargs
     ) -> list[str]:
         # role = 'Ты - помощник копирайтера.'

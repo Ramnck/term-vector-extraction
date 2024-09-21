@@ -78,7 +78,14 @@ class TranslatorBase(ABC):
     def __init__(self, *args, **kwargs) -> None:
         raise NotImplementedError
 
-    def translate(self, words: list[str], **kwargs) -> list[str]:
+    def translate_list(
+        self,
+        words: list[str],
+        from_lang: str = "ru",
+        to_lang: str = "en",
+        num_of_suggestions: int = 2,
+        **kwargs,
+    ) -> list[str]:
         raise NotImplementedError
 
     def get_name(self) -> str:

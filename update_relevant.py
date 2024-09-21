@@ -9,10 +9,9 @@ from pathlib import Path
 
 import aiofiles
 import numpy as np
-from tqdm.asyncio import tqdm_asyncio
-
-from api import LoaderBase
-from chain import (
+from base import LoaderBase
+from documents import FileSystem, FipsAPI
+from pipeline import (
     BASE_DATA_PATH,
     FIPS_API_KEY,
     extract_keywords_from_docs,
@@ -22,7 +21,7 @@ from chain import (
     save_data_to_json,
     test_different_vectors,
 )
-from documents import FileSystem, FipsAPI
+from tqdm.asyncio import tqdm_asyncio
 
 logger = logging.getLogger(__name__)
 

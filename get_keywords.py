@@ -15,31 +15,39 @@ import aiofiles
 import numpy as np
 from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
+from tqdm import tqdm
 from tqdm.asyncio import tqdm_asyncio
 
-from api import DocumentBase, KeyWordExtractorBase, LoaderBase
-from chain import (
-    BASE_DATA_PATH,
-    FIPS_API_KEY,
-    extract_keywords_from_docs,
-    get_cluster_from_document,
-    get_relevant,
-    load_data_from_json,
-    save_data_to_json,
-    test_different_vectors,
-)
-from documents import FileSystem, FipsAPI
-from extractors import (
+from tve.base import DocumentBase, KeyWordExtractorBase, LoaderBase
+from tve.documents import BlankDoc, FIPSAPILoader, FSLoader
+from tve.extractors import (
     KeyBERTExtractor,
     KeyBERTModel,
     RuLongrormerEmbedder,
+    TransformerEmbedder,
     YAKExtractor,
 )
-from lexis import (
+from tve.lexis import (
     clean_ru_text,
     extract_number,
     lemmatize_ru_word,
     make_extended_term_vec,
+)
+from tve.pipeline import (
+    BASE_DATA_PATH,
+    CACHE_DIR,
+    ES_URL,
+    FIPS_API_KEY,
+    extract_keywords_from_docs,
+    get_cluster_from_document,
+    get_relevant,
+    test_different_vectors,
+)
+from tve.utils import (
+    ForgivingTaskGroup,
+    batched,
+    load_data_from_json,
+    save_data_to_json,
 )
 
 load_dotenv()
@@ -47,77 +55,208 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 extractors = [
-    YAKExtractor(),
+    # YAKExtractor(),
+    # KeyBERTExtractor(
+    #     SentenceTransformer(
+    #         "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+    #     ),
+    #     "mpnet",
+    # ),
+    # KeyBERTExtractor(
+    #     SentenceTransformer("intfloat/multilingual-e5-large"),
+    #     "e5-large",
+    #     doc_prefix="passage: ",
+    #     word_prefix="query: ",
+    # ),
+    # KeyBERTExtractor(
+    #     SentenceTransformer("ai-forever/ru-en-RoSBERTa"),
+    #     "RoSBERTa",
+    #     doc_prefix="search_document: ",
+    #     word_prefix="search_query: ",
+    # ),
+    # KeyBERTExtractor(
+    #     TransformerEmbedder("ai-forever/ruElectra-large"),
+    #     "ruELECTRA",
+    # ),
+    # KeyBERTExtractor(
+    #     TransformerEmbedder("ai-forever/sbert_large_nlu_ru"),
+    #     "ruSBERT",
+    # ),
     KeyBERTExtractor(
-        SentenceTransformer(
-            "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
-        ),
-        "multilingual-mpnet",
-    ),
-    KeyBERTExtractor(
-        SentenceTransformer("intfloat/multilingual-e5-large"),
-        "e5-large",
-        text_extraction_func=lambda doc: "query: " + doc.text,
+        SentenceTransformer("jinaai/jina-embeddings-v3", trust_remote_code=True),
+        "jina",
+        word_embed_kwargs={"prompt_name": "text-matching", "task": "text-matching"},
+        doc_embed_kwargs={"prompt_name": "text-matching", "task": "text-matching"},
     ),
 ]
+
+
+async def process_document(
+    doc: DocumentBase,
+    api: LoaderBase,
+    name_of_experiment: Path | str,
+    loader: LoaderBase | None = None,
+    performance: dict | None = None,
+):
+
+    # cluster = await get_cluster_from_document(doc, loader, timeout=180)
+
+    # keywords = await extract_keywords_from_docs(
+    #     cluster, extractors, performance=performance
+    # )
+
+    path_of_file = (
+        BASE_DATA_PATH / "eval" / name_of_experiment / (doc.id_date + ".json")
+    )
+
+    old_data = await load_data_from_json(path_of_file)
+
+    if old_data is not None:
+        data = old_data
+        keywords = data["keywords"]
+    else:
+        keywords = {}
+        data = {"doc_id": doc.id_date, "56": doc.citations, "cluster": doc.cluster}
+
+    new_keywords = await extract_keywords_from_docs(doc, extractors)
+
+    keywords.update(new_keywords)
+
+    # temp_doc = BlankDoc()
+    # temp_doc.text = " ".join(map(lambda x: x.text, cluster))
+
+    # for ex in extractors:
+    #     if ex.get_name() not in keywords.keys():
+    #         keywords[ex.get_name()] = [ex.get_keywords(temp_doc, num=200)]
+
+    # if not keywords["YAKE"][0][0]:
+    #     logger.error("Doc  %d has empty kws" % doc.id)
+    #     logger.error("  ".join(map(lambda x: x.id_date, cluster)))
+
+    data["keywords"] = keywords
+
+    if await save_data_to_json(data, path_of_file):
+        logger.error("Error occured while saving %s file" % path_of_file.name)
+
+
+async def process_path(
+    doc: Path,
+    loader: LoaderBase,
+    name_of_experiment: Path | str,
+    api: LoaderBase | None = None,
+):
+    path = doc
+    docs = list(map(lambda x: x.stem, path.iterdir()))
+    main_doc = path.stem.split("_")[0]
+    if not main_doc:
+        logger.error("Main doc not found in %s" % str(path))
+        return
+    tmp = [main_doc == i for i in docs]
+
+    docs[0], docs[tmp.index(True)] = docs[tmp.index(True)], docs[0]
+
+    # doc = BlankDoc(await loader.get_doc(docs[0]))
+
+    cluster = [await loader.get_doc(i) for i in docs]
+
+    doc = cluster[0]
+
+    if await load_data_from_json(
+        BASE_DATA_PATH / "eval" / name_of_experiment / (doc.id_date + ".json")
+    ):
+        return
+
+    data = {
+        "doc_id": doc.id_date,
+        "56": doc.citations,
+        "cluster": list(
+            dict.fromkeys(doc.cluster + list(map(lambda x: x.id_date, cluster)))
+        ),
+    }
+
+    # data = await load_data_from_json(
+    #     BASE_DATA_PATH / "eval" / name_of_experiment / (doc.id_date + ".json")
+    # )
+
+    keywords = {}
+    # keywords = data["keywords"]
+
+    temp_doc = BlankDoc()
+    temp_doc.text = " ".join(map(lambda x: x.text, cluster))
+
+    for ex in extractors:
+        keywords[ex.get_name()] = [ex.get_keywords(temp_doc, num=200)]
+
+    if not keywords["YAKE"][0][0]:
+        logger.error("Doc  %d has empty kws" % doc.id)
+        logger.error("  ".join(map(lambda x: x.id_date, cluster)))
+
+    data["keywords"] = keywords
+
+    path_of_file = (
+        BASE_DATA_PATH / "eval" / name_of_experiment / (doc.id_date + ".json")
+    )
+    if await save_data_to_json(data, path_of_file):
+        logger.error("Error occured while saving %s file" % path_of_file.name)
 
 
 async def main(
     loader: LoaderBase,
     api: LoaderBase,
+    input_path: str,
     num_of_docs: int | None = None,
     name_of_experiment: str = "KWE",
+    num_of_workers: int = 1,
 ):
     logger.info("Начало обработки")
 
-    performance = {i.get_name(): {"document_len": [], "time": []} for i in extractors}
+    # performance = {i.get_name(): {"document_len": [], "time": []} for i in extractors}
+    performance = None
+
+    progress_bar = tqdm(desc="Progress", total=num_of_docs)
 
     num_of_doc = 0
-    async for doc in tqdm_asyncio(aiter(loader), total=num_of_docs, desc="Progress"):
-        num_of_doc += 1
+    # async for doc in tqdm_asyncio(aiter(loader), total=num_of_docs, desc="Progress"):
 
-        if doc.id_date != "RU2291285C1_20070110":
-            continue
+    docs = [doc async for doc in loader][104:num_of_docs]
 
-        data = {"doc_id": doc.id, "56": doc.citations, "cluster": doc.cluster}
+    # docs = list((BASE_DATA_PATH / "raw" / input_path).iterdir())
 
-        cluster = await get_cluster_from_document(doc, api)
+    for doc_batch in batched(docs, n=num_of_workers):
+        async with ForgivingTaskGroup() as tg:
 
-        keywords = await extract_keywords_from_docs(
-            cluster, extractors, performance=performance
-        )
+            def new_on_task_done(task):
+                asyncio.TaskGroup._on_task_done(tg, task)
+                progress_bar.update(1)
 
-        if not keywords["YAKE"][0][0]:
-            logger.error("Doc %d has empty kws" % doc.id)
-            logger.error(" ".join(map(lambda x: x.id_date, cluster)))
+            tg._on_task_done = new_on_task_done
 
-        # for extractor_name in keywords.keys():
-        #     keywords[extractor_name] = make_extended_term_vec(keywords[extractor_name])
-        data["keywords"] = keywords
+            for doc in doc_batch:
+                task = (
+                    process_document if isinstance(doc, DocumentBase) else process_path
+                )
+                tg.create_task(
+                    task(
+                        doc=doc,
+                        api=api,
+                        loader=loader,
+                        name_of_experiment=name_of_experiment,
+                    )
+                )
+    progress_bar.close()
 
-        # relevant = await get_relevant(keywords, api)
-
-        # data["relevant"] = relevant
+    if performance:
+        logger.info("Средняя скорость работы алгоритмов:")
+        for extractor_name, value in performance.items():
+            mean_time = np.mean(value["time"])
+            out = f"{extractor_name} : {round(mean_time, 2)} s"
+            logger.info(out)
 
         path_of_file = (
-            BASE_DATA_PATH / "eval" / name_of_experiment / (doc.id_date + ".json")
+            BASE_DATA_PATH / "eval" / (name_of_experiment + "_performance.json")
         )
-        if await save_data_to_json(data, path_of_file):
+        if await save_data_to_json(performance, path_of_file):
             logger.error("Error occured while saving %s file" % path_of_file.name)
-
-        if num_of_docs is not None:
-            if num_of_doc >= num_of_docs:
-                break
-
-    logger.info("Средняя скорость работы алгоритмов:")
-    for extractor_name, value in performance.items():
-        mean_time = np.mean(value["time"])
-        out = f"{extractor_name} : {round(mean_time, 2)} s"
-        logger.info(out)
-
-    path_of_file = BASE_DATA_PATH / "eval" / (name_of_experiment + "_performance.json")
-    if await save_data_to_json(performance, path_of_file):
-        logger.error("Error occured while saving %s file" % path_of_file.name)
 
 
 if __name__ == "__main__":
@@ -126,11 +265,12 @@ if __name__ == "__main__":
     parser.add_argument("-i", "--input", default="clusters")
     parser.add_argument("-o", "--output", default="80")
     parser.add_argument("-n", "--number", default=None, type=int)
+    parser.add_argument("-w", "--num-of-workers", default=5, type=int)
 
     args = parser.parse_args()
 
-    api = FipsAPI(FIPS_API_KEY)
-    loader = FileSystem(Path("data") / "raw" / args.input)
+    api = FIPSAPILoader(FIPS_API_KEY)
+    loader = FSLoader(Path("data") / "raw" / args.input, CACHE_DIR, api)
 
-    coro = main(loader, api, args.number, args.output)
+    coro = main(loader, api, args.input, args.number, args.output, args.num_of_workers)
     asyncio.run(coro)

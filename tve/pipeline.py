@@ -9,14 +9,14 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from api import DocumentBase, KeyWordExtractorBase, LoaderBase
-from lexis import (
+from .base import DocumentBase, KeyWordExtractorBase, LoaderBase, TranslatorBase
+from .lexis import (
     clean_ru_text,
     extract_number,
     lemmatize_ru_word,
     make_extended_term_vec,
 )
-from utils import ForgivingTaskGroup, batched
+from .utils import ForgivingTaskGroup, batched
 
 name = [Path(sys.argv[0]).name] + sys.argv[1:]
 filename = " ".join(name)
@@ -44,11 +44,8 @@ logging.getLogger().addHandler(handler)
 BASE_DATA_PATH = Path("data")
 FIPS_API_KEY = os.getenv("FIPS_API_KEY")
 ES_URL = os.getenv("ES_URL")
-
-
-if FIPS_API_KEY is None:
-    logger.error("Не указан API ключ")
-    exit(1)
+CACHE_DIR = Path("E:") / "FIPS" / "cache"
+PROMT_IP = os.getenv("PROMT_IP")
 
 
 async def get_cluster_from_document(
@@ -99,6 +96,8 @@ async def extract_keywords_from_docs(
 
     for ex in extractors:
         name = ex.get_name()
+
+        # if 1:
         try:
             tmp_kws = []
 
@@ -183,6 +182,47 @@ async def test_different_vectors(
         except* Exception as exs:
             for ex in exs.exceptions:
                 logger.error("Exception in test_different - %s" % str(ex))
+
+        relevant_results = {}
+        for k, v in relevant.items():
+            try:
+                relevant_results[k] = v.result()
+            except:
+                relevant_results[k] = []
+
+        return relevant_results
+
+
+async def test_translation(
+    data_keywords: dict[str, list[list[str]]],
+    api: LoaderBase,
+    translator: TranslatorBase,
+    nums_of_translations: list[int] = [2],
+    num_of_workers: int = 3,
+    timeout: int = 30,
+) -> dict[str, list[str]]:
+
+    relevant = {}
+
+    try:
+        async with ForgivingTaskGroup() as tg:
+            for extractor_name, term_vec_vec in data_keywords.items():
+                for num in nums_of_translations:
+                    for method in ["append", "replace"]:
+                        name = "_".join([extractor_name, str(num), method])
+                        termvec = []
+                        if method == "append":
+                            termvec += term_vec_vec[0]
+                        trans = await translator.translate_list(
+                            term_vec_vec[0], num_of_suggestions=num
+                        )
+                        for i in ["same_pos", "diff_pos"]:
+                            relevant[name + "_" + i] = tg.create_task(
+                                api.find_relevant_by_keywords(termvec + trans[i])
+                            )
+    except* Exception as exs:
+        for ex in exs.exceptions:
+            logger.error("Exception in test_translation - %s" % str(ex))
 
     relevant_results = {}
     for k, v in relevant.items():

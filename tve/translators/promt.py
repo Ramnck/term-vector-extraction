@@ -1,10 +1,11 @@
 import logging
+import urllib.request
 from operator import itemgetter
+from urllib.parse import quote
 
 import aiohttp
 import nltk
-
-from api import TranslatorBase
+from base import TranslatorBase
 from lexis import pos_tag_en, pos_tags_ru
 from utils import ForgivingTaskGroup
 
@@ -12,8 +13,9 @@ logger = logging.getLogger(__name__)
 
 
 class PROMTTranslator(TranslatorBase):
-    def __init__(self) -> None:
-        self.api_url = "http://rospsearch01/twsas/Services/v1/rest.svc"
+    def __init__(self, ip: str) -> None:
+        self.ip = ip
+        self.api_url = f"http://{ip}/twsas/Services/v1/rest.svc"
 
     async def _translate_word(
         self,
@@ -23,48 +25,22 @@ class PROMTTranslator(TranslatorBase):
         profile: str = "Универсальный",
         remove_linebreaks: bool = True,
     ) -> dict:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                self.api_url + "/TranslateTextWithED",
-                data={
-                    "from": from_lang,
-                    "to": to_lang,
-                    "profile": profile,
-                    "removeLinebreaks": remove_linebreaks,
-                    "text": word,
-                },
-            ) as res:
-                out = await res.text(encoding="utf-8")
+
+        word = quote(word)
+        profile = quote(profile)
+
+        req_data = f"text={word}&from={from_lang}&to={to_lang}&profile={profile}"
+
+        req_url = self.api_url + "/TranslateTextWithED" + "?" + req_data
+
+        with urllib.request.urlopen(req_url) as response:
+            out = response.read().decode(response.headers.get_content_charset())
 
         return {"word": word, "translations": out.split("; ")}
 
     async def _choose_words_en(
         self, word: str, translations: list[str], num_words: int = 2
     ) -> dict[str, list[str]]:
-
-        # role = "You're an assistant copywriter."
-        # task = f"I give you a set of words and phrases in English. Your task is to choose {num_words} words or phrases that mean different parts of speech. For example: 1 verb, 1 noun or 1 noun, 1 adjective or 1 verb, 1 adjective or etc. Or return me {num_words} words or phrases if they all belong to the same part of speech."
-        # ans_format = 'Answer me succinctly and without explanation in json array of your suggestions: ["", ""].'
-
-        # sys_prompt = " ".join([role, task, ans_format])
-
-        # prompt = ", ".join(translations)
-
-        # output = llm_llama.create_chat_completion(
-        #     messages=[
-        #         {
-        #             "role": "user",
-        #             "content": " ".join([sys_prompt, "Here is set of words:", prompt])
-        #             + ".",
-        #         },
-        #     ],
-        #     stop=None,
-        # )
-        # str_output = output["choices"][0]["message"]["content"]
-
-        # data = json.loads(
-        #     str_output[str_output.index("[") : str_output.rindex("]") + 1]
-        # )
 
         data = {"same_pos": [], "diff_pos": []}
 
@@ -97,7 +73,7 @@ class PROMTTranslator(TranslatorBase):
 
         return data
 
-    async def translate(
+    async def translate_list(
         self,
         words: list[str],
         from_lang: str = "ru",
@@ -140,7 +116,7 @@ class PROMTTranslator(TranslatorBase):
 
         data_output = {
             "same_pos": sum(map(itemgetter("same_pos"), data_dict_list), start=[]),
-            "diff_pos": sum(map(itemgetter("same_pos"), data_dict_list), start=[]),
+            "diff_pos": sum(map(itemgetter("diff_pos"), data_dict_list), start=[]),
         }
 
         # for data_dict in out:

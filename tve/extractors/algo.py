@@ -1,7 +1,7 @@
 import yake
 
-from api import DocumentBase, KeyWordExtractorBase
-from lexis import (
+from ..base import DocumentBase, KeyWordExtractorBase
+from ..lexis import (
     clean_ru_text,
     lemmatize_doc,
     lemmatize_ru_word,

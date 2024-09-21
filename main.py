@@ -13,22 +13,9 @@ from pathlib import Path
 
 import aiofiles
 import numpy as np
-from dotenv import load_dotenv
-from sentence_transformers import SentenceTransformer
-from tqdm.asyncio import tqdm_asyncio
-
-from api import DocumentBase, KeyWordExtractorBase, LoaderBase
-from chain import (
-    BASE_DATA_PATH,
-    FIPS_API_KEY,
-    extract_keywords_from_docs,
-    get_cluster_from_document,
-    get_relevant,
-    load_data_from_json,
-    save_data_to_json,
-    test_different_vectors,
-)
+from base import DocumentBase, KeyWordExtractorBase, LoaderBase
 from documents import FileSystem, FipsAPI
+from dotenv import load_dotenv
 from extractors import (
     KeyBERTExtractor,
     KeyBERTModel,
@@ -41,6 +28,18 @@ from lexis import (
     lemmatize_ru_word,
     make_extended_term_vec,
 )
+from pipeline import (
+    BASE_DATA_PATH,
+    FIPS_API_KEY,
+    extract_keywords_from_docs,
+    get_cluster_from_document,
+    get_relevant,
+    load_data_from_json,
+    save_data_to_json,
+    test_different_vectors,
+)
+from sentence_transformers import SentenceTransformer
+from tqdm.asyncio import tqdm_asyncio
 
 load_dotenv()
 
