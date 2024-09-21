@@ -15,6 +15,8 @@ from .fips import FIPSDocument
 
 logger = logging.getLogger(__name__)
 
+logging.getLogger("elasticsearch").setLevel(logging.ERROR)
+
 
 class ESAPILoader(LoaderBase):
     def __init__(

@@ -6,9 +6,10 @@ import re
 
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = 0
 import aiohttp
-from base import TranslatorBase
 from llama_cpp import Llama
-from utils import ForgivingTaskGroup
+
+from ..base import TranslatorBase
+from ..utils import ForgivingTaskGroup
 
 llm_llama = Llama(
     model_path="E:\\models\\ggufs\\Vikhr-Gemma-2B-instruct-Q8_0.gguf",
