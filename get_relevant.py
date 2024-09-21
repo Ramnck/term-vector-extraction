@@ -14,7 +14,7 @@ from tqdm import tqdm
 from tqdm.asyncio import tqdm_asyncio
 
 from tve.base import LoaderBase
-from tve.documents import FileSystem, FipsAPI, InternalESAPI
+from tve.documents import ESAPILoader, FIPSAPILoader, FSLoader
 from tve.pipeline import (
     BASE_DATA_PATH,
     ES_URL,
@@ -112,9 +112,9 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    api = FipsAPI(FIPS_API_KEY)
-    # api = InternalESAPI(ES_URL)
-    # loader = FileSystem(Path("data") / "raw" / args.docs)
+    # api = FIPSAPILoader(FIPS_API_KEY)
+    api = ESAPILoader(ES_URL)
+    # loader = FSLoader(Path("data") / "raw" / args.docs)
 
     coro = main(api, args.number, args.input, args.output, args.num_of_workers)
     asyncio.run(coro)
