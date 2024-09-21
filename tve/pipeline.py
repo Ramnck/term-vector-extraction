@@ -204,9 +204,12 @@ async def test_translation(
 
     relevant = {}
 
-    methods = product(
-        [data_keywords.items(), nums_of_translations, ["append", "replace"]]
+    methods = list(
+        product(data_keywords.items(), nums_of_translations, ["append", "replace"])
     )
+
+    if len(methods) < 7 * 4 * 2:
+        print("too few methods: %d" % len(methods))
 
     try:
         for (extractor_name, term_vec_vec), num, compose in methods:
