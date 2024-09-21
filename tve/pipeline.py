@@ -220,9 +220,9 @@ async def test_translation(
                             termvec + v
                         )
 
-    except* Exception as exs:
-        for ex in exs.exceptions:
-            logger.error("Exception in test_translation - %s" % str(ex))
+    except Exception as ex:
+        # for ex in exs.exceptions:
+        logger.error("Exception in test_translation - %s" % str(ex))
 
     # relevant_results = {}
     # for k, v in relevant.items():
