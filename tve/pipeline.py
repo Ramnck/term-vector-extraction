@@ -205,30 +205,30 @@ async def test_translation(
     relevant = {}
 
     try:
-        async with ForgivingTaskGroup() as tg:
-            for extractor_name, term_vec_vec in data_keywords.items():
-                for num in nums_of_translations:
-                    for method in ["append", "replace"]:
-                        name = "_".join([extractor_name, str(num), method])
-                        termvec = []
-                        if method == "append":
-                            termvec += term_vec_vec[0]
-                        trans = await translator.translate_list(
-                            term_vec_vec[0], num_of_suggestions=num
+        for extractor_name, term_vec_vec in data_keywords.items():
+            for num in nums_of_translations:
+                for method in ["append", "replace"]:
+                    name = "_".join([extractor_name, str(num), method])
+                    termvec = []
+                    if method == "append":
+                        termvec += term_vec_vec[0]
+                    trans = await translator.translate_list(
+                        term_vec_vec[0], num_of_suggestions=num
+                    )
+                    for k, v in trans.items():
+                        relevant[name + "_" + k] = await api.find_relevant_by_keywords(
+                            termvec + v
                         )
-                        for i in ["same_pos", "diff_pos"]:
-                            relevant[name + "_" + i] = tg.create_task(
-                                api.find_relevant_by_keywords(termvec + trans[i])
-                            )
+
     except* Exception as exs:
         for ex in exs.exceptions:
             logger.error("Exception in test_translation - %s" % str(ex))
 
-    relevant_results = {}
-    for k, v in relevant.items():
-        try:
-            relevant_results[k] = v.result()
-        except:
-            relevant_results[k] = []
+    # relevant_results = {}
+    # for k, v in relevant.items():
+    #     try:
+    #         relevant_results[k] = v.result()
+    #     except:
+    #         relevant_results[k] = []
 
-    return relevant_results
+    return relevant
