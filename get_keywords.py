@@ -74,20 +74,20 @@ extractors = [
     #     doc_prefix="search_document: ",
     #     word_prefix="search_query: ",
     # ),
-    # KeyBERTExtractor(
-    #     TransformerEmbedder("ai-forever/ruElectra-large"),
-    #     "ruELECTRA",
-    # ),
-    # KeyBERTExtractor(
-    #     TransformerEmbedder("ai-forever/sbert_large_nlu_ru"),
-    #     "ruSBERT",
-    # ),
     KeyBERTExtractor(
-        SentenceTransformer("jinaai/jina-embeddings-v3", trust_remote_code=True),
-        "jina",
-        word_embed_kwargs={"prompt_name": "text-matching", "task": "text-matching"},
-        doc_embed_kwargs={"prompt_name": "text-matching", "task": "text-matching"},
+        TransformerEmbedder("ai-forever/ruElectra-large"),
+        "ruELECTRA",
     ),
+    KeyBERTExtractor(
+        TransformerEmbedder("ai-forever/sbert_large_nlu_ru"),
+        "ruSBERT",
+    ),
+    # KeyBERTExtractor(
+    #     SentenceTransformer("jinaai/jina-embeddings-v3", trust_remote_code=True),
+    #     "jina",
+    #     word_embed_kwargs={"prompt_name": "text-matching", "task": "text-matching"},
+    #     doc_embed_kwargs={"prompt_name": "text-matching", "task": "text-matching"},
+    # ),
 ]
 
 

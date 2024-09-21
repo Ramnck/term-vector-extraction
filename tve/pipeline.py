@@ -204,21 +204,25 @@ async def test_translation(
 
     relevant = {}
 
+    methods = product(
+        [data_keywords.items(), nums_of_translations, ["append", "replace"]]
+    )
+
     try:
-        for extractor_name, term_vec_vec in data_keywords.items():
-            for num in nums_of_translations:
-                for method in ["append", "replace"]:
-                    name = "_".join([extractor_name, str(num), method])
-                    termvec = []
-                    if method == "append":
-                        termvec += term_vec_vec[0]
-                    trans = await translator.translate_list(
-                        term_vec_vec[0], num_of_suggestions=num
-                    )
-                    for k, v in trans.items():
-                        relevant[name + "_" + k] = await api.find_relevant_by_keywords(
-                            termvec + v
-                        )
+        for (extractor_name, term_vec_vec), num, compose in methods:
+            name = "_".join([extractor_name, str(num), compose])
+            termvec = []
+            if compose == "append":
+                termvec += term_vec_vec[0]
+            trans = await translator.translate_list(
+                term_vec_vec[0], num_of_suggestions=num
+            )
+            if len(trans) < 2:
+                logger.error("Empty translations list in %s" % name)
+            for k, v in trans.items():
+                relevant[name + "_" + k] = await api.find_relevant_by_keywords(
+                    termvec + v
+                )
 
     except Exception as ex:
         # for ex in exs.exceptions:
