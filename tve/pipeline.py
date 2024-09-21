@@ -211,12 +211,12 @@ async def test_translation(
     if len(methods) < 7 * 4 * 2:
         print("too few methods: %d" % len(methods))
 
-    try:
-        for (extractor_name, term_vec_vec), num, compose in methods:
-            name = "_".join([extractor_name, str(num), compose])
-            termvec = []
-            if compose == "append":
-                termvec += term_vec_vec[0]
+    for (extractor_name, term_vec_vec), num, compose in methods:
+        name = "_".join([extractor_name, str(num), compose])
+        termvec = []
+        if compose == "append":
+            termvec += term_vec_vec[0]
+        try:
             trans = await translator.translate_list(
                 term_vec_vec[0], num_of_suggestions=num
             )
@@ -227,9 +227,9 @@ async def test_translation(
                     termvec + v
                 )
 
-    except Exception as ex:
-        # for ex in exs.exceptions:
-        logger.error("Exception in test_translation - %s" % str(ex))
+        except Exception as ex:
+            # for ex in exs.exceptions:
+            logger.error("Exception in test_translation - %s" % str(ex))
 
     # relevant_results = {}
     # for k, v in relevant.items():
