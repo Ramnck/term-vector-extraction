@@ -97,7 +97,6 @@ class PROMTTranslator(TranslatorBase):
                 logger.error(
                     "Exception in PROMTTranslator.translate - %s" % str(type(ex))
                 )
-                print(ex)
 
         out = []
 
@@ -105,8 +104,10 @@ class PROMTTranslator(TranslatorBase):
             try:
                 if future.result() is not None:
                     out.append(future.result())
-            except:
-                pass
+            except Exception as ex:
+                logger.error(
+                    "Exception in PROMTTranslator future.result - %s" % str(type(ex))
+                )
 
         data_dict_list = [
             await self._choose_words_en(
