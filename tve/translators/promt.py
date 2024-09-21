@@ -5,9 +5,10 @@ from urllib.parse import quote
 
 import aiohttp
 import nltk
-from base import TranslatorBase
-from lexis import pos_tag_en, pos_tags_ru
-from utils import ForgivingTaskGroup
+
+from ..base import TranslatorBase
+from ..lexis import pos_tag_en, pos_tags_ru
+from ..utils import ForgivingTaskGroup
 
 logger = logging.getLogger(__name__)
 
