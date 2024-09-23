@@ -87,7 +87,7 @@ async def main(
                     kws = {k: data["keywords"][k] for k in ["YAKE", "jina", "e5-large"]}
 
                     rel_coro = test_translation(
-                        kws, api, translator, range(1, 4), 1, num_of_relevant=50
+                        kws, api, translator, range(1, 4), num_of_relevant=50
                     )
 
                     tg.create_task(
@@ -98,14 +98,15 @@ async def main(
 
         except* Exception as exs:
             for ex in exs.exceptions:
-                logger.error("Exception in test_different - %s" % str(ex))
+                logger.error("Exception in main - %s" % str(ex))
 
     progress_bar.close()
     n_tr = sum(map(lambda x: len(x["tr"]), translator.cache.values()))
     n_w = len(translator.cache)
-    logger.info(
-        "В среднем %3.2f переводов на слово (всего %d слов)" % (n_tr / n_w, n_w)
-    )
+    if n_w > 0:
+        logger.info(
+            "В среднем %3.2f переводов на слово (всего %d слов)" % (n_tr / n_w, n_w)
+        )
 
 
 if __name__ == "__main__":
@@ -122,7 +123,6 @@ if __name__ == "__main__":
 
     # api = FIPSAPILoader(FIPS_API_KEY)
     api = ESAPILoader(ES_URL)
-    # loader = FSLoader(Path("data") / "raw" / args.docs)
 
     coro = main(api, args.number, args.input, args.output, args.num_of_workers)
     asyncio.run(coro)
