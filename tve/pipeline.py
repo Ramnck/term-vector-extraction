@@ -214,7 +214,7 @@ async def test_translation(
             )
             trans = trans["same_pos"]
             tv = list(map(lambda x: "".join(re.findall(r"[A-Za-zа-яА-Я-]", x)), trans))
-            tv = compress(tv, tv)
+            tv = list(compress(tv, tv))
             if len(tv) < 2:
                 logger.error("Empty translations list in %s" % name)
                 continue
