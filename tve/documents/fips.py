@@ -210,7 +210,7 @@ class FIPSAPILoader(LoaderBase):
         return await self.get_doc_by_id_date(doc.get("id", "no_id"))
 
     async def find_relevant_by_keywords(
-        self, kws: list[str], num_of_docs=20, offset=0, timeout: int = 30
+        self, kws: list[str], num_of_docs: int = 35, offset: int = 0, timeout: int = 30
     ) -> list[str]:
         res = await self._search_query(
             q=" OR ".join(compress(kws, kws)),

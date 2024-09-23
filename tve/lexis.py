@@ -43,9 +43,10 @@ def pos_tag_en(word: str, simplify: bool = False) -> str:
     return tag
 
 
-def extract_number(text: str, stripped: bool = False) -> str:
-    m = re.search(r"\d+", text.replace("/", ""))
-    res = m.group() if m else ""
+def extract_number(text: str, stripped: bool = True) -> str:
+    m = re.findall(r"(\d{2,4}/)?(\d+)(?:/\d+)?", text)
+    res = "".join(m[0]) if len(m) > 0 else ""
+    res = res.replace("/", "")
     return res.lstrip("0") if stripped else res
 
 
@@ -130,7 +131,7 @@ def make_extended_term_vec(
 
 def extract_citaions(text: str) -> list[str]:
     # Регулярное выражение для патентной заявки
-    pattern = r"\b([A-Z]{2}) ?(?:\d{2,4}[/\\])?(\d+),? ?\n?([A-ZА-Я]\d?)?,? ?(\d{2,4})[ .,/\-](\d{2})[ .,/\-](\d{2,4})\b"
+    pattern = r"\b([A-Z]{2}) ?(?:\d{2,4}[/\\])?(\d+)(?:[/\\]\d{1,4})?,? ?\n?([A-ZА-Я]\d?)?,? ?(\d{2,4})[ .,/\-](\d{2})[ .,/\-](\d{2,4})\b"
 
     delete_pattern = r"(кл. |\n)"
     text = re.sub(delete_pattern, "", text)

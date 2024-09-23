@@ -1,3 +1,4 @@
+import logging
 from operator import itemgetter
 from typing import Any, Callable, List, Tuple
 
@@ -15,6 +16,10 @@ from transformers import (
 
 from ..base import DocumentBase, EmbedderBase, KeyWordExtractorBase
 from ..lexis import clean_ru_text, lemmatize_doc, stopwords_ru_en
+
+logging.getLogger(
+    "transformers_modules.jinaai.xlm-roberta-flash-implementation.1b0fa280120671ad929f87840474894ca90c5f6d.modeling_xlm_roberta"
+).setLevel(logging.ERROR)
 
 
 def mmr(

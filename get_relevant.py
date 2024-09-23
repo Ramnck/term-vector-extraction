@@ -6,6 +6,7 @@ import os
 import sys
 import time
 from itertools import product
+from operator import itemgetter
 from pathlib import Path
 
 import aiofiles
@@ -36,7 +37,7 @@ from tve.utils import (
 
 logger = logging.getLogger(__name__)
 
-translator = PROMTTranslator(PROMT_IP)
+translator = PROMTTranslator(PROMT_IP, enable_cache=True)
 
 
 async def process_document(relevant_coroutine, data_dict, dir_path):
@@ -83,8 +84,10 @@ async def main(
                     #     data["keywords"], methods, lens_of_vec, api, timeout=180
                     # )
 
+                    kws = {k: data["keywords"][k] for k in ["YAKE", "jina", "e5-large"]}
+
                     rel_coro = test_translation(
-                        data["keywords"], api, translator, range(1, 4), 1
+                        kws, api, translator, range(1, 4), 1, num_of_relevant=50
                     )
 
                     tg.create_task(
@@ -98,6 +101,11 @@ async def main(
                 logger.error("Exception in test_different - %s" % str(ex))
 
     progress_bar.close()
+    n_tr = sum(map(lambda x: len(x["tr"]), translator.cache.values()))
+    n_w = len(translator.cache)
+    logger.info(
+        "В среднем %3.2f переводов на слово (всего %d слов)" % (n_tr / n_w, n_w)
+    )
 
 
 if __name__ == "__main__":

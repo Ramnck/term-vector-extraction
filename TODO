@@ -13,5 +13,5 @@
 # - добавить в eval проверку по номеру
 ; - добавить полноценную поддержку английского (в экстракторы)
 - make get_name prorepty method
-- add cache
+# - add cache
 - add parsing of 2num year

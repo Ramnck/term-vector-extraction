@@ -62,7 +62,9 @@ class LoaderBase(ABC):
     async def get_random_doc(self) -> DocumentBase:
         raise NotImplementedError
 
-    async def find_relevant_by_keywords(self, kws) -> list[str]:
+    async def find_relevant_by_keywords(
+        self, kws: list[str], num_of_docs: int, offset: int, timeout: int
+    ) -> list[str]:
         raise NotImplementedError
 
 

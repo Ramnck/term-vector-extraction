@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import json
 import logging
+import random
 import sys
 import time
 from itertools import chain, cycle
@@ -68,26 +69,26 @@ extractors = [
     #     doc_prefix="passage: ",
     #     word_prefix="query: ",
     # ),
-    # KeyBERTExtractor(
-    #     SentenceTransformer("ai-forever/ru-en-RoSBERTa"),
-    #     "RoSBERTa",
-    #     doc_prefix="search_document: ",
-    #     word_prefix="search_query: ",
-    # ),
     KeyBERTExtractor(
-        TransformerEmbedder("ai-forever/ruElectra-large"),
-        "ruELECTRA",
-    ),
-    KeyBERTExtractor(
-        TransformerEmbedder("ai-forever/sbert_large_nlu_ru"),
-        "ruSBERT",
+        SentenceTransformer("ai-forever/ru-en-RoSBERTa"),
+        "RoSBERTa",
+        doc_prefix="search_document: ",
+        word_prefix="search_query: ",
     ),
     # KeyBERTExtractor(
-    #     SentenceTransformer("jinaai/jina-embeddings-v3", trust_remote_code=True),
-    #     "jina",
-    #     word_embed_kwargs={"prompt_name": "text-matching", "task": "text-matching"},
-    #     doc_embed_kwargs={"prompt_name": "text-matching", "task": "text-matching"},
+    #     TransformerEmbedder("ai-forever/ruElectra-large"),
+    #     "ruELECTRA",
     # ),
+    # KeyBERTExtractor(
+    #     TransformerEmbedder("ai-forever/sbert_large_nlu_ru"),
+    #     "ruSBERT",
+    # ),
+    KeyBERTExtractor(
+        SentenceTransformer("jinaai/jina-embeddings-v3", trust_remote_code=True),
+        "jina",
+        word_embed_kwargs={"prompt_name": "text-matching", "task": "text-matching"},
+        doc_embed_kwargs={"prompt_name": "text-matching", "task": "text-matching"},
+    ),
 ]
 
 
@@ -99,7 +100,7 @@ async def process_document(
     performance: dict | None = None,
 ):
 
-    # cluster = await get_cluster_from_document(doc, loader, timeout=180)
+    cluster = await get_cluster_from_document(doc, loader, timeout=180)
 
     # keywords = await extract_keywords_from_docs(
     #     cluster, extractors, performance=performance
@@ -118,20 +119,20 @@ async def process_document(
         keywords = {}
         data = {"doc_id": doc.id_date, "56": doc.citations, "cluster": doc.cluster}
 
-    new_keywords = await extract_keywords_from_docs(doc, extractors)
+    # new_keywords = await extract_keywords_from_docs(doc, extractors)
 
-    keywords.update(new_keywords)
+    # keywords.update(new_keywords)
 
-    # temp_doc = BlankDoc()
-    # temp_doc.text = " ".join(map(lambda x: x.text, cluster))
+    temp_doc = BlankDoc()
+    temp_doc.text = " ".join(map(lambda x: x.text, cluster))
 
-    # for ex in extractors:
-    #     if ex.get_name() not in keywords.keys():
-    #         keywords[ex.get_name()] = [ex.get_keywords(temp_doc, num=200)]
+    for ex in extractors:
+        if ex.get_name() not in keywords.keys():
+            keywords[ex.get_name()] = [ex.get_keywords(temp_doc, num=200)]
 
-    # if not keywords["YAKE"][0][0]:
-    #     logger.error("Doc  %d has empty kws" % doc.id)
-    #     logger.error("  ".join(map(lambda x: x.id_date, cluster)))
+    if not keywords[random.choice(extractors).get_name()][0][0]:
+        logger.error("Doc  %d has empty kws" % doc.id)
+        logger.error("  ".join(map(lambda x: x.id_date, cluster)))
 
     data["keywords"] = keywords
 
@@ -161,18 +162,22 @@ async def process_path(
 
     doc = cluster[0]
 
-    if await load_data_from_json(
+    data = await load_data_from_json(
         BASE_DATA_PATH / "eval" / name_of_experiment / (doc.id_date + ".json")
-    ):
-        return
+    )
 
-    data = {
+    data_upd = {
         "doc_id": doc.id_date,
         "56": doc.citations,
         "cluster": list(
             dict.fromkeys(doc.cluster + list(map(lambda x: x.id_date, cluster)))
         ),
     }
+
+    data.update(data_upd)
+
+    if all(map(lambda x: x.get_name() in data.get("keywords", {}).keys(), extractors)):
+        return
 
     # data = await load_data_from_json(
     #     BASE_DATA_PATH / "eval" / name_of_experiment / (doc.id_date + ".json")
@@ -187,7 +192,7 @@ async def process_path(
     for ex in extractors:
         keywords[ex.get_name()] = [ex.get_keywords(temp_doc, num=200)]
 
-    if not keywords["YAKE"][0][0]:
+    if not keywords[random.choice(extractors).get_name()][0][0]:
         logger.error("Doc  %d has empty kws" % doc.id)
         logger.error("  ".join(map(lambda x: x.id_date, cluster)))
 
@@ -218,9 +223,9 @@ async def main(
     num_of_doc = 0
     # async for doc in tqdm_asyncio(aiter(loader), total=num_of_docs, desc="Progress"):
 
-    docs = [doc async for doc in loader][104:num_of_docs]
+    # docs = [doc async for doc in loader][104:num_of_docs]
 
-    # docs = list((BASE_DATA_PATH / "raw" / input_path).iterdir())
+    docs = list((BASE_DATA_PATH / "raw" / input_path).iterdir())
 
     for doc_batch in batched(docs, n=num_of_workers):
         async with ForgivingTaskGroup() as tg:

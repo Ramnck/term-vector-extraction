@@ -198,45 +198,31 @@ async def test_translation(
     api: LoaderBase,
     translator: TranslatorBase,
     nums_of_translations: list[int] = [2],
-    num_of_workers: int = 3,
+    num_of_relevant: int = 35,
     timeout: int = 30,
 ) -> dict[str, list[str]]:
 
     relevant = {}
 
-    methods = list(
-        product(data_keywords.items(), nums_of_translations, ["append", "replace"])
-    )
+    methods = product(data_keywords.items(), nums_of_translations)
 
-    # if len(methods) < 7 * 4 * 2:
-    # print("too few methods: %d" % len(methods))
-
-    for (extractor_name, term_vec_vec), num, compose in methods:
-        name = "_".join([extractor_name, str(num), compose])
-        termvec = []
-        if compose == "append":
-            termvec += term_vec_vec[0]
+    for (extractor_name, term_vec_vec), num in methods:
+        name = "_".join([extractor_name, str(num)])
         try:
             trans = await translator.translate_list(
                 term_vec_vec[0], num_of_suggestions=num
             )
-            if len(trans) < 2:
+            trans = trans["same_pos"]
+            tv = list(map(lambda x: "".join(re.findall(r"[A-Za-zа-яА-Я-]", x)), trans))
+            tv = compress(tv, tv)
+            if len(tv) < 2:
                 logger.error("Empty translations list in %s" % name)
-            for k, v in trans.items():
-                tv = termvec + v
-                tv = list(map(lambda x: "".join(re.findall(r"[A-Za-zа-яА-Я-]", x)), tv))
-                tv = compress(tv, tv)
-                relevant[name + "_" + k] = await api.find_relevant_by_keywords(tv)
+                continue
+            relevant[name] = await api.find_relevant_by_keywords(
+                tv, num_of_docs=num_of_relevant, timeout=timeout
+            )
 
         except Exception as ex:
-            # for ex in exs.exceptions:
             logger.error("Exception in test_translation - %s" % str(ex))
-
-    # relevant_results = {}
-    # for k, v in relevant.items():
-    #     try:
-    #         relevant_results[k] = v.result()
-    #     except:
-    #         relevant_results[k] = []
 
     return relevant

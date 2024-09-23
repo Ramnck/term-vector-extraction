@@ -14,9 +14,11 @@ logger = logging.getLogger(__name__)
 
 
 class PROMTTranslator(TranslatorBase):
-    def __init__(self, ip: str) -> None:
+    def __init__(self, ip: str, enable_cache: bool = False) -> None:
         self.ip = ip
         self.api_url = f"http://{ip}/twsas/Services/v1/rest.svc"
+
+        self.cache = {} if enable_cache else None
 
     async def _translate_word(
         self,
@@ -27,17 +29,24 @@ class PROMTTranslator(TranslatorBase):
         remove_linebreaks: bool = True,
     ) -> dict:
 
-        word = quote(word)
-        profile = quote(profile)
+        if self.cache is None or word not in self.cache.keys():
+            q_word = quote(word)
+            profile = quote(profile)
 
-        req_data = f"text={word}&from={from_lang}&to={to_lang}&profile={profile}"
+            req_data = f"text={q_word}&from={from_lang}&to={to_lang}&profile={profile}"
 
-        req_url = self.api_url + "/TranslateTextWithED" + "?" + req_data
+            req_url = self.api_url + "/TranslateTextWithED" + "?" + req_data
 
-        with urllib.request.urlopen(req_url) as response:
-            out = response.read().decode(response.headers.get_content_charset())
+            with urllib.request.urlopen(req_url) as response:
+                out = response.read().decode(response.headers.get_content_charset())
 
-        return {"word": word, "translations": out.split("; ")}
+            out = out.split("; ")
+            self.cache[word] = {"n": 1, "tr": out}
+        else:
+            self.cache[word]["n"] += 1
+            out = self.cache[word]["tr"]
+
+        return {"word": word, "translations": out}
 
     async def _choose_words_en(
         self, word: str, translations: list[str], num_words: int = 2
