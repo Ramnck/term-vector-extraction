@@ -209,6 +209,18 @@ async def test_translation(
     for (extractor_name, term_vec_vec), num in methods:
         name = "_".join([extractor_name, str(num)])
         try:
+
+            addition = [
+                {
+                    "query_string": {
+                        "query": "US",
+                        "fields": ["id", "common.publishing_office"],
+                    }
+                }
+            ]
+
+            # addition = None
+
             trans = await translator.translate_list(
                 term_vec_vec[0], num_of_suggestions=num
             )
@@ -219,7 +231,10 @@ async def test_translation(
                 logger.error("Empty translations list in %s" % name)
                 continue
             relevant[name] = await api.find_relevant_by_keywords(
-                tv, num_of_docs=num_of_relevant, timeout=timeout
+                tv,
+                num_of_docs=num_of_relevant,
+                timeout=timeout,
+                additional_shoulds=addition,
             )
 
         except Exception as ex:

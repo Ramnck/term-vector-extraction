@@ -116,7 +116,12 @@ class ESAPILoader(LoaderBase):
         pass
 
     async def find_relevant_by_keywords(
-        self, kws: list[str], num_of_docs: int = 35, offset: int = 0, timeout: int = 30
+        self,
+        kws: list[str],
+        num_of_docs: int = 35,
+        offset: int = 0,
+        timeout: int = 30,
+        additional_shoulds: list[dict] | None = None,
     ) -> list[str]:
         _source_includes = [
             "common.document_number",
@@ -142,6 +147,10 @@ class ESAPILoader(LoaderBase):
                 }
             }
         }
+
+        if additional_shoulds:
+            query["query"]["bool"]["should"] += additional_shoulds
+
         res = await self.es.search(
             index=self.index,
             body=query,

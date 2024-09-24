@@ -60,6 +60,7 @@ async def main(
     dir_path = BASE_DATA_PATH / "eval" / input_path
 
     doc_paths = list(dir_path.iterdir())[:num_of_docs]
+    os.makedirs(BASE_DATA_PATH / "eval" / output_path, exist_ok=True)
 
     methods = ["raw"]
     lens_of_vec = [125, 150, 175, 200]
@@ -107,6 +108,7 @@ async def main(
         logger.info(
             "В среднем %3.2f переводов на слово (всего %d слов)" % (n_tr / n_w, n_w)
         )
+        await save_data_to_json(translator.cache, BASE_DATA_PATH / "cache.json")
 
 
 if __name__ == "__main__":

@@ -24,9 +24,7 @@ class FIPSDocument(DocumentBase):
 
     @property
     def cluster(self) -> list[str]:
-        cluster = [self.id_date] + self.citations
-        cluster += self.raw_json.get("cluster", [])
-
+        cluster = [self.id_date] + self.raw_json.get("cluster", []) + self.citations
         return list(dict.fromkeys(cluster))
 
     @property

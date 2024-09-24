@@ -225,6 +225,8 @@ async def main(
 
     # docs = [doc async for doc in loader][104:num_of_docs]
 
+    os.makedirs(BASE_DATA_PATH / "eval" / name_of_experiment, exist_ok=True)
+
     docs = list((BASE_DATA_PATH / "raw" / input_path).iterdir())
 
     for doc_batch in batched(docs, n=num_of_workers):
