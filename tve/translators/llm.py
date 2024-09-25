@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 class LLMTranslator(TranslatorBase):
     def __init__(self) -> None:
+        self.name = "llm"
         # self.llm = Llama(model_path=model_path, n_ctx=0, verbose=False, n_gpu_layers=-1)
         pass
 
@@ -70,6 +71,3 @@ class LLMTranslator(TranslatorBase):
         extension = set(words)
 
         return list(extension)
-
-    def get_name(self) -> str:
-        return "llm"

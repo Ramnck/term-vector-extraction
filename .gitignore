@@ -2,6 +2,7 @@ data/eval/*
 data/raw/*
 data/old
 data/logs/*
+data/*
 __pycache__/
 test.*
 __.ipynb

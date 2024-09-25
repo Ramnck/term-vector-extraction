@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 class PROMTTranslator(TranslatorBase):
     def __init__(self, ip: str, enable_cache: bool = False) -> None:
+        self.name = "promt"
         self.ip = ip
         self.api_url = f"http://{ip}/twsas/Services/v1/rest.svc"
 
@@ -40,7 +41,7 @@ class PROMTTranslator(TranslatorBase):
             with urllib.request.urlopen(req_url) as response:
                 out = response.read().decode(response.headers.get_content_charset())
 
-            out = out.split("; ")
+            out = out.replace('"', "").split("; ")
             self.cache[word] = {"n": 1, "tr": out}
         else:
             self.cache[word]["n"] += 1
@@ -137,6 +138,3 @@ class PROMTTranslator(TranslatorBase):
         #     extension += words
 
         return data_output
-
-    def get_name(self) -> str:
-        return "promt"

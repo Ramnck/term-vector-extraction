@@ -41,14 +41,21 @@ class DocumentBase(ABC):
 
 
 class KeyWordExtractorBase(ABC):
+    _name = "NOT_IMPL"
+
     def __init__(self) -> None:
         raise NotImplementedError
 
     def get_keywords(self, doc: DocumentBase, **kwargs) -> list[str]:
         raise NotImplementedError
 
-    def get_name(self) -> str:
-        return "NOT_IMPL"
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @name.setter
+    def name(self, n: str):
+        self._name = n
 
 
 class LoaderBase(ABC):
@@ -77,6 +84,8 @@ class EmbedderBase(ABC):
 
 
 class TranslatorBase(ABC):
+    _name = "NOT_IMPL"
+
     def __init__(self, *args, **kwargs) -> None:
         raise NotImplementedError
 
@@ -90,5 +99,10 @@ class TranslatorBase(ABC):
     ) -> list[str]:
         raise NotImplementedError
 
-    def get_name(self) -> str:
-        return "NOT_IMPL"
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @name.setter
+    def name(self, n: str):
+        self._name = n

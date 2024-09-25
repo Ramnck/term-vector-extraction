@@ -89,13 +89,13 @@ async def extract_keywords_from_docs(
 
     if docs is None:
         logger.error("No docs given to extract_keywords_from_docs")
-        return {i.get_name(): [[""]] for i in extractors}
+        return {i.name: [[""]] for i in extractors}
 
     if isinstance(docs, DocumentBase):
         docs = [docs]
 
     for ex in extractors:
-        name = ex.get_name()
+        name = ex.name
 
         # if 1:
         try:

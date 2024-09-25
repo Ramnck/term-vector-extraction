@@ -18,7 +18,7 @@ from ..base import DocumentBase, EmbedderBase, KeyWordExtractorBase
 from ..lexis import clean_ru_text, lemmatize_doc, stopwords_ru_en
 
 logging.getLogger(
-    "transformers_modules.jinaai.xlm-roberta-flash-implementation.1b0fa280120671ad929f87840474894ca90c5f6d.modeling_xlm_roberta"
+    "transformers_modules.jinaai.xlm-roberta-flash-implementation"
 ).setLevel(logging.ERROR)
 
 
@@ -257,7 +257,7 @@ class KeyBERTExtractor(KeyWordExtractorBase):
         word_prefix: str = "",
         **kwargs,
     ) -> None:
-        self.method_name = method_name
+        self.name = method_name
         if isinstance(model, KeyBERTModel):
             self.model = model
         elif isinstance(model, SentenceTransformer):
@@ -299,6 +299,3 @@ class KeyBERTExtractor(KeyWordExtractorBase):
         )
 
         return [i[0] for i in out]
-
-    def get_name(self) -> str:
-        return self.method_name

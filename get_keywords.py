@@ -56,25 +56,25 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 extractors = [
-    # YAKExtractor(),
+    YAKExtractor(),
     # KeyBERTExtractor(
     #     SentenceTransformer(
     #         "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
     #     ),
     #     "mpnet",
     # ),
-    # KeyBERTExtractor(
-    #     SentenceTransformer("intfloat/multilingual-e5-large"),
-    #     "e5-large",
-    #     doc_prefix="passage: ",
-    #     word_prefix="query: ",
-    # ),
     KeyBERTExtractor(
-        SentenceTransformer("ai-forever/ru-en-RoSBERTa"),
-        "RoSBERTa",
-        doc_prefix="search_document: ",
-        word_prefix="search_query: ",
+        SentenceTransformer("intfloat/multilingual-e5-large"),
+        "e5-large",
+        doc_prefix="passage: ",
+        word_prefix="query: ",
     ),
+    # KeyBERTExtractor(
+    #     SentenceTransformer("ai-forever/ru-en-RoSBERTa"),
+    #     "RoSBERTa",
+    #     doc_prefix="search_document: ",
+    #     word_prefix="search_query: ",
+    # ),
     # KeyBERTExtractor(
     #     TransformerEmbedder("ai-forever/ruElectra-large"),
     #     "ruELECTRA",
@@ -98,9 +98,11 @@ async def process_document(
     name_of_experiment: Path | str,
     loader: LoaderBase | None = None,
     performance: dict | None = None,
+    skip_done: bool = False,
+    rewrite: bool = True,
 ):
 
-    cluster = await get_cluster_from_document(doc, loader, timeout=180)
+    # cluster = await get_cluster_from_document(doc, loader, timeout=180)
 
     # keywords = await extract_keywords_from_docs(
     #     cluster, extractors, performance=performance
@@ -110,7 +112,7 @@ async def process_document(
         BASE_DATA_PATH / "eval" / name_of_experiment / (doc.id_date + ".json")
     )
 
-    old_data = await load_data_from_json(path_of_file)
+    old_data = await load_data_from_json(path_of_file) if rewrite else None
 
     if old_data is not None:
         data = old_data
@@ -119,20 +121,26 @@ async def process_document(
         keywords = {}
         data = {"doc_id": doc.id_date, "56": doc.citations, "cluster": doc.cluster}
 
+    if skip_done and all(
+        map(lambda x: x.name in data.get("keywords", {}).keys(), extractors)
+    ):
+        return
+
     # new_keywords = await extract_keywords_from_docs(doc, extractors)
 
     # keywords.update(new_keywords)
 
-    temp_doc = BlankDoc()
-    temp_doc.text = " ".join(map(lambda x: x.text, cluster))
+    # temp_doc = BlankDoc()
+    # temp_doc.text = " ".join(map(lambda x: x.text, cluster))
+    temp_doc = doc
 
     for ex in extractors:
-        if ex.get_name() not in keywords.keys():
-            keywords[ex.get_name()] = [ex.get_keywords(temp_doc, num=200)]
+        if ex.name not in keywords.keys():
+            keywords[ex.name] = [ex.get_keywords(temp_doc, num=200)]
 
-    if not keywords[random.choice(extractors).get_name()][0][0]:
+    if not keywords[random.choice(extractors).name][0][0]:
         logger.error("Doc  %d has empty kws" % doc.id)
-        logger.error("  ".join(map(lambda x: x.id_date, cluster)))
+        logger.error("  ".join(map(lambda x: x.id_date, [doc])))
 
     data["keywords"] = keywords
 
@@ -145,6 +153,8 @@ async def process_path(
     loader: LoaderBase,
     name_of_experiment: Path | str,
     api: LoaderBase | None = None,
+    skip_done: bool = False,
+    rewrite: bool = True,
 ):
     path = doc
     docs = list(map(lambda x: x.stem, path.iterdir()))
@@ -162,8 +172,12 @@ async def process_path(
 
     doc = cluster[0]
 
-    data = await load_data_from_json(
-        BASE_DATA_PATH / "eval" / name_of_experiment / (doc.id_date + ".json")
+    data = (
+        await load_data_from_json(
+            BASE_DATA_PATH / "eval" / name_of_experiment / (doc.id_date + ".json")
+        )
+        if rewrite
+        else None
     )
 
     data_upd = {
@@ -176,7 +190,9 @@ async def process_path(
 
     data.update(data_upd)
 
-    if all(map(lambda x: x.get_name() in data.get("keywords", {}).keys(), extractors)):
+    if skip_done and all(
+        map(lambda x: x.name in data.get("keywords", {}).keys(), extractors)
+    ):
         return
 
     # data = await load_data_from_json(
@@ -190,9 +206,9 @@ async def process_path(
     temp_doc.text = " ".join(map(lambda x: x.text, cluster))
 
     for ex in extractors:
-        keywords[ex.get_name()] = [ex.get_keywords(temp_doc, num=200)]
+        keywords[ex.name] = [ex.get_keywords(temp_doc, num=200)]
 
-    if not keywords[random.choice(extractors).get_name()][0][0]:
+    if not keywords[random.choice(extractors).name][0][0]:
         logger.error("Doc  %d has empty kws" % doc.id)
         logger.error("  ".join(map(lambda x: x.id_date, cluster)))
 
@@ -212,10 +228,12 @@ async def main(
     num_of_docs: int | None = None,
     name_of_experiment: str = "KWE",
     num_of_workers: int = 1,
+    skip_done: bool = False,
+    rewrite: bool = True,
 ):
     logger.info("Начало обработки")
 
-    # performance = {i.get_name(): {"document_len": [], "time": []} for i in extractors}
+    # performance = {i.name: {"document_len": [], "time": []} for i in extractors}
     performance = None
 
     progress_bar = tqdm(desc="Progress", total=num_of_docs)
@@ -223,11 +241,11 @@ async def main(
     num_of_doc = 0
     # async for doc in tqdm_asyncio(aiter(loader), total=num_of_docs, desc="Progress"):
 
-    # docs = [doc async for doc in loader][104:num_of_docs]
+    docs = [doc async for doc in loader][104:num_of_docs]
 
     os.makedirs(BASE_DATA_PATH / "eval" / name_of_experiment, exist_ok=True)
 
-    docs = list((BASE_DATA_PATH / "raw" / input_path).iterdir())
+    # docs = list((BASE_DATA_PATH / "raw" / input_path).iterdir())
 
     for doc_batch in batched(docs, n=num_of_workers):
         async with ForgivingTaskGroup() as tg:
@@ -248,6 +266,8 @@ async def main(
                         api=api,
                         loader=loader,
                         name_of_experiment=name_of_experiment,
+                        skip_done=skip_done,
+                        rewrite=rewrite,
                     )
                 )
     progress_bar.close()
@@ -269,15 +289,29 @@ async def main(
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Extract term vectors from documents")
-    parser.add_argument("-i", "--input", default="clusters")
-    parser.add_argument("-o", "--output", default="80")
+    parser.add_argument("-i", "--input", required=True)
+    parser.add_argument("-o", "--output", default=None)
     parser.add_argument("-n", "--number", default=None, type=int)
-    parser.add_argument("-w", "--num-of-workers", default=5, type=int)
+    parser.add_argument("-w", "--num-of-workers", default=1, type=int)
+    parser.add_argument("--no-rewrite", action="store_true", default=False)
+    parser.add_argument("--skip", "--skip-done", action="store_true", default=False)
 
     args = parser.parse_args()
 
     api = FIPSAPILoader(FIPS_API_KEY)
     loader = FSLoader(Path("data") / "raw" / args.input, CACHE_DIR, api)
 
-    coro = main(loader, api, args.input, args.number, args.output, args.num_of_workers)
+    if args.output is None:
+        args.output = args.input
+
+    coro = main(
+        loader,
+        api,
+        args.input,
+        args.number,
+        args.output,
+        args.num_of_workers,
+        skip_done=args.skip,
+        rewrite=not args.no_rewrite,
+    )
     asyncio.run(coro)

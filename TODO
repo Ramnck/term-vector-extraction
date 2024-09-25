@@ -12,6 +12,6 @@
 ; - добавить парсинг дат для 56ого поля (сделать правильные айдишники)
 # - добавить в eval проверку по номеру
 ; - добавить полноценную поддержку английского (в экстракторы)
-- make get_name prorepty method
+; - make get_name prorepty method
 # - add cache
-- add parsing of 2num year
+; - add parsing of 2num year

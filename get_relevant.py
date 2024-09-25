@@ -119,7 +119,7 @@ if __name__ == "__main__":
     parser.add_argument("-i", "--input", default="80")
     parser.add_argument("-o", "--output", default="80_rel")
     parser.add_argument("-n", "--number", default=None, type=int)
-    parser.add_argument("-w", "--num-of-workers", default=50, type=int)
+    parser.add_argument("-w", "--num-of-workers", default=5, type=int)
 
     args = parser.parse_args()
 

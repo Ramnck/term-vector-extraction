@@ -1,4 +1,5 @@
 import re
+import time
 from itertools import chain, compress, cycle
 from pathlib import Path
 from typing import Callable
@@ -145,6 +146,14 @@ def extract_citaions(text: str) -> list[str]:
         date = match[-3:]
         if len(match[-1]) == 4:
             date = date[::-1]
+        elif len(match[0]) == 4:
+            pass
+        else:
+            if int(date[0]) > time.gmtime(time.time()).tm_year % 100:
+                date[0] = "19" + date[0]
+            else:
+                date[0] = "20" + date[0]
+
         date = "".join(date)
 
         id = "".join(match[:3])
