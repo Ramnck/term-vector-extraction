@@ -124,15 +124,25 @@ async def get_relevant(
 ) -> dict[str, list[str]]:
     relevant = {}
 
-    async with ForgivingTaskGroup() as tg:
-        for extractor_name, kw in keywords.items():
-            relevant[extractor_name] = tg.create_task(
-                api.find_relevant_by_keywords(kw, num_of_docs=50, timeout=90)
-            )
+    try:
+        async with ForgivingTaskGroup() as tg:
+            for extractor_name, kw in keywords.items():
+                relevant[extractor_name] = tg.create_task(
+                    api.find_relevant_by_keywords(kw, num_of_docs=50, timeout=90)
+                )
+    except* Exception as exs:
+        for ex in exs.exceptions:
+            logger.error("Ex in get_relevant - %s" % str(ex))
 
-    relevant = {k: v.result() for k, v in relevant.items()}
+    relevant_results = {}
+    for k, v in relevant.items():
+        try:
+            relevant_results[k] = v.result()
+        except Exception as ex:
+            logger.error("ex in future.result() - %s - %s" % (str(type(ex)), str(ex)))
+            relevant_results[k] = []
 
-    return relevant
+    return relevant_results
 
 
 async def test_different_vectors(
