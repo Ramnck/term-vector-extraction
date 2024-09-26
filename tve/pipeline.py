@@ -120,30 +120,34 @@ async def extract_keywords_from_docs(
 
 
 async def get_relevant(
-    keywords: dict[str, list[str]], api: LoaderBase, filter_only_us: bool = False
+    keywords: dict[str, list[str]],
+    api: LoaderBase,
 ) -> dict[str, list[str]]:
     relevant = {}
 
-    addition = (
-        [
-            {
-                "query_string": {
-                    "query": "US",
-                    "fields": ["id", "common.publishing_office"],
-                    "boost": 100.0,
-                }
-            }
-        ]
-        if filter_only_us
-        else None
-    )
+    # addition = (
+    #     [
+    #         {
+    #             "query_string": {
+    #                 "query": "US",
+    #                 "fields": ["id", "common.publishing_office"],
+    #                 "boost": 100.0,
+    #             }
+    #         }
+    #     ]
+    #     if filter_only_us
+    #     else None
+    # )
 
     try:
         async with ForgivingTaskGroup() as tg:
             for extractor_name, kw in keywords.items():
                 relevant[extractor_name] = tg.create_task(
                     api.find_relevant_by_keywords(
-                        kw, num_of_docs=50, timeout=90, additional_shoulds=addition
+                        kw,
+                        num_of_docs=50,
+                        timeout=90,
+                        # additional_shoulds=addition
                     )
                 )
     except* Exception as exs:
@@ -226,7 +230,7 @@ async def test_translation(
     nums_of_translations: list[int] = [2],
     num_of_relevant: int = 35,
     timeout: int = 30,
-    filter_only_us: bool = False,
+    # filter_only_us: bool = False,
 ) -> dict[str, list[str]]:
 
     relevant = {}
@@ -237,19 +241,19 @@ async def test_translation(
         name = "_".join([extractor_name, str(num)])
         try:
 
-            addition = (
-                [
-                    {
-                        "query_string": {
-                            "query": "US",
-                            "fields": ["id", "common.publishing_office"],
-                            "boost": 100.0,
-                        }
-                    }
-                ]
-                if filter_only_us
-                else None
-            )
+            # addition = (
+            #     [
+            #         {
+            #             "query_string": {
+            #                 "query": "US",
+            #                 "fields": ["id", "common.publishing_office"],
+            #                 "boost": 100.0,
+            #             }
+            #         }
+            #     ]
+            #     if filter_only_us
+            #     else None
+            # )
 
             trans = await translator.translate_list(
                 term_vec_vec[0], num_of_suggestions=num
@@ -264,7 +268,7 @@ async def test_translation(
                 tv,
                 num_of_docs=num_of_relevant,
                 timeout=timeout,
-                additional_shoulds=addition,
+                # additional_shoulds=addition,
             )
 
         except Exception as ex:

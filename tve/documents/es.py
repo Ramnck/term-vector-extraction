@@ -121,7 +121,7 @@ class ESAPILoader(LoaderBase):
         num_of_docs: int = 35,
         offset: int = 0,
         timeout: int = 30,
-        additional_shoulds: list[dict] | None = None,
+        # additional_shoulds: list[dict] | None = None,
     ) -> list[str]:
         _source_includes = [
             "common.document_number",
@@ -149,8 +149,8 @@ class ESAPILoader(LoaderBase):
             }
         }
 
-        if additional_shoulds:
-            query["query"]["bool"]["should"] += additional_shoulds
+        # if additional_shoulds:
+        # query["query"]["bool"]["should"] += additional_shoulds
 
         res = await self.es.search(
             index=self.index,

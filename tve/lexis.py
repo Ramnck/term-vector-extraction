@@ -89,9 +89,8 @@ def lemmatize_doc(
         doc = doc.split()
 
     for token in doc:
-        token = "".join(
-            re.findall(r"([А-Яа-яA-Za-zёЁ]+)(-[А-Яа-яA-Za-zёЁ]+)?", token)[0]
-        )
+        match = re.findall(r"([А-Яа-яA-Za-zёЁ]+)(-[А-Яа-яA-Za-zёЁ]+)?", token)
+        token = "".join(match[0]) if len(match) > 0 else None
         if token:
             token = lemmatize_ru_word(token)
             if token not in stopwords:
@@ -144,7 +143,8 @@ def extract_citaions(text: str) -> list[str]:
     matches = re.findall(pattern, text)
 
     out = []
-    for match in matches:
+    for match_ in matches:
+        match = list(match_)
         date = match[-3:]
         if len(match[-1]) == 4:
             date = date[::-1]

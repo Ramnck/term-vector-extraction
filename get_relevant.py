@@ -130,6 +130,8 @@ if __name__ == "__main__":
     # api = FIPSAPILoader(FIPS_API_KEY)
     api = ESAPILoader(ES_URL)
 
+    api.index = ["may22_us"]
+
     if args.output is None:
         args.output = args.input + "_rel"
 
