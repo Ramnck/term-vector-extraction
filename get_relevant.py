@@ -65,17 +65,11 @@ async def main(
     methods = ["raw"]
     lens_of_vec = [125, 150, 175, 200]
 
-    progress_bar = tqdm(desc="Progress", total=num_of_docs)
+    progress_bar = tqdm(desc="Progress", total=len(doc_paths))
 
     for doc_path_batch in batched(doc_paths, n=num_of_workers):
         try:
-            async with ForgivingTaskGroup() as tg:
-
-                def new_on_task_done(task):
-                    asyncio.TaskGroup._on_task_done(tg, task)
-                    progress_bar.update(1)
-
-                tg._on_task_done = new_on_task_done
+            async with ForgivingTaskGroup(progress_bar) as tg:
 
                 for doc_path in doc_path_batch:
 

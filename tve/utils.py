@@ -3,10 +3,20 @@ import json
 from pathlib import Path
 
 import aiofiles
+from tqdm import tqdm
 
 
 class ForgivingTaskGroup(asyncio.TaskGroup):
     _abort = lambda self: None
+
+    def __init__(self, progress_bar: tqdm | None = None) -> None:
+        self.progress_bar = progress_bar
+        super().__init__()
+
+    def _on_task_done(self, task: asyncio.Task[object]) -> None:
+        super(ForgivingTaskGroup, self)._on_task_done(task)
+        if self.progress_bar:
+            self.progress_bar.update(1)
 
 
 def batched(iterable, n=1):

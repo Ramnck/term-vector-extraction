@@ -236,8 +236,6 @@ async def main(
     # performance = {i.name: {"document_len": [], "time": []} for i in extractors}
     performance = None
 
-    progress_bar = tqdm(desc="Progress", total=num_of_docs)
-
     num_of_doc = 0
     # async for doc in tqdm_asyncio(aiter(loader), total=num_of_docs, desc="Progress"):
 
@@ -245,16 +243,12 @@ async def main(
 
     os.makedirs(BASE_DATA_PATH / "eval" / name_of_experiment, exist_ok=True)
 
+    progress_bar = tqdm(desc="Progress", total=len(docs))
+
     # docs = list((BASE_DATA_PATH / "raw" / input_path).iterdir())
 
     for doc_batch in batched(docs, n=num_of_workers):
-        async with ForgivingTaskGroup() as tg:
-
-            def new_on_task_done(task):
-                asyncio.TaskGroup._on_task_done(tg, task)
-                progress_bar.update(1)
-
-            tg._on_task_done = new_on_task_done
+        async with ForgivingTaskGroup(progress_bar) as tg:
 
             for doc in doc_batch:
                 task = (
