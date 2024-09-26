@@ -56,19 +56,19 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 extractors = [
-    YAKExtractor(),
+    # YAKExtractor(),
     # KeyBERTExtractor(
     #     SentenceTransformer(
     #         "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
     #     ),
     #     "mpnet",
     # ),
-    KeyBERTExtractor(
-        SentenceTransformer("intfloat/multilingual-e5-large"),
-        "e5-large",
-        doc_prefix="passage: ",
-        word_prefix="query: ",
-    ),
+    # KeyBERTExtractor(
+    #     SentenceTransformer("intfloat/multilingual-e5-large"),
+    #     "e5-large",
+    #     doc_prefix="passage: ",
+    #     word_prefix="query: ",
+    # ),
     # KeyBERTExtractor(
     #     SentenceTransformer("ai-forever/ru-en-RoSBERTa"),
     #     "RoSBERTa",
@@ -177,7 +177,7 @@ async def process_path(
             BASE_DATA_PATH / "eval" / name_of_experiment / (doc.id_date + ".json")
         )
         if rewrite
-        else None
+        else {}
     )
 
     data_upd = {
@@ -241,7 +241,7 @@ async def main(
     num_of_doc = 0
     # async for doc in tqdm_asyncio(aiter(loader), total=num_of_docs, desc="Progress"):
 
-    docs = [doc async for doc in loader][104:num_of_docs]
+    docs = [doc async for doc in loader][:num_of_docs]
 
     os.makedirs(BASE_DATA_PATH / "eval" / name_of_experiment, exist_ok=True)
 

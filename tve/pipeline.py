@@ -127,7 +127,7 @@ async def get_relevant(
     async with ForgivingTaskGroup() as tg:
         for extractor_name, kw in keywords.items():
             relevant[extractor_name] = tg.create_task(
-                api.find_relevant_by_keywords(kw, num_of_docs=30, timeout=90)
+                api.find_relevant_by_keywords(kw, num_of_docs=50, timeout=90)
             )
 
     relevant = {k: v.result() for k, v in relevant.items()}

@@ -85,11 +85,15 @@ async def main(
                     #     data["keywords"], methods, lens_of_vec, api, timeout=180
                     # )
 
-                    kws = {k: data["keywords"][k] for k in ["YAKE", "jina", "e5-large"]}
+                    # kws = {k: data["keywords"][k] for k in ["YAKE", "jina", "e5-large"]}
 
-                    rel_coro = test_translation(
-                        kws, api, translator, range(1, 4), num_of_relevant=50
-                    )
+                    # rel_coro = test_translation(
+                    # kws, api, translator, range(1, 4), num_of_relevant=50
+                    # )
+
+                    kws = {k: v[0] for k, v in data["keywords"].items()}
+
+                    rel_coro = get_relevant(kws, api)
 
                     tg.create_task(
                         process_document(
@@ -116,8 +120,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Get relevant using term vectors vectors"
     )
-    parser.add_argument("-i", "--input", default="80")
-    parser.add_argument("-o", "--output", default="80_rel")
+    parser.add_argument("-i", "--input", required=True)
+    parser.add_argument("-o", "--output", default=None)
     parser.add_argument("-n", "--number", default=None, type=int)
     parser.add_argument("-w", "--num-of-workers", default=5, type=int)
 
@@ -125,6 +129,9 @@ if __name__ == "__main__":
 
     # api = FIPSAPILoader(FIPS_API_KEY)
     api = ESAPILoader(ES_URL)
+
+    if args.output is None:
+        args.output = args.input + "_rel"
 
     coro = main(api, args.number, args.input, args.output, args.num_of_workers)
     asyncio.run(coro)
