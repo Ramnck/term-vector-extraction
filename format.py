@@ -51,7 +51,11 @@ async def main(
                 file.write(f"{doc_id} {name_of_result}\n")
             with open(result_path / name_of_result, "w+", encoding="utf-8") as file:
                 for res in relevant:
-                    file.write(format_id(res) + "\n")
+                    try:
+                        file.write(format_id(res) + "\n")
+                    except Exception as ex:
+                        print(res)
+                        # raise ex
 
 
 if __name__ == "__main__":

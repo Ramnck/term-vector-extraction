@@ -135,11 +135,12 @@ class ESAPILoader(LoaderBase):
                     "should": [
                         {
                             "query_string": {
-                                "query": " ".join(kws),
+                                "query": " OR ".join(map(lambda x: f"({x})", kws)),
                                 "fields": self._fields,
                                 "type": "most_fields",
                                 "default_operator": "OR",
                                 "quote_field_suffix": ".no_stemmer",
+                                "enable_position_increments": False,
                             }
                         }
                     ],

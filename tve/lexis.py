@@ -89,7 +89,9 @@ def lemmatize_doc(
         doc = doc.split()
 
     for token in doc:
-        token = "".join(re.findall(r"[А-Яа-яA-Za-z-]+", token.strip("-")))
+        token = "".join(
+            re.findall(r"([А-Яа-яA-Za-zёЁ]+)(-[А-Яа-яA-Za-zёЁ]+)?", token)[0]
+        )
         if token:
             token = lemmatize_ru_word(token)
             if token not in stopwords:
