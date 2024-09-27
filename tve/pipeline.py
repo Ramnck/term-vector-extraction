@@ -227,7 +227,7 @@ async def test_translation(
     data_keywords: dict[str, list[list[str]]],
     api: LoaderBase,
     translator: TranslatorBase,
-    nums_of_translations: list[int] = [2],
+    nums_of_translations: list[int] = [3],
     num_of_relevant: int = 35,
     timeout: int = 30,
     # filter_only_us: bool = False,
@@ -238,7 +238,8 @@ async def test_translation(
     methods = product(data_keywords.items(), nums_of_translations)
 
     for (extractor_name, term_vec_vec), num in methods:
-        name = "_".join([extractor_name, str(num)])
+        # name = "_".join([extractor_name, str(num)])
+        name = extractor_name
         try:
 
             # addition = (
