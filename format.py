@@ -35,7 +35,7 @@ async def main(
     for file_path in input_dir_path.iterdir():
         data = await load_data_from_json(file_path)
         doc_id = data["doc_id"]
-        # doc_analog = data["cluster"][1]
+        doc_analog = data.get("cluster", ["", ""])[1]
         all_relevant = data["relevant"]
 
         for method_name, relevant in all_relevant.items():
@@ -44,11 +44,12 @@ async def main(
             path = dir_path / extractor_name
             os.makedirs(path, exist_ok=True)
             with open(path / "mapping.txt", "a+", encoding="utf-8") as file:
-                result_path = path / "result_lists"
+                result_path = path
                 os.makedirs(result_path, exist_ok=True)
                 number = len(list(result_path.iterdir()))
                 name_of_result = f"result_list{number}.txt"
                 file.write(f"{doc_id} {name_of_result}\n")
+                # file.write(f"{doc_analog} {name_of_result}\n")
             with open(result_path / name_of_result, "w+", encoding="utf-8") as file:
                 for res in relevant:
                     try:

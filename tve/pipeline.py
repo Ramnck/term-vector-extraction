@@ -125,20 +125,6 @@ async def get_relevant(
 ) -> dict[str, list[str]]:
     relevant = {}
 
-    # addition = (
-    #     [
-    #         {
-    #             "query_string": {
-    #                 "query": "US",
-    #                 "fields": ["id", "common.publishing_office"],
-    #                 "boost": 100.0,
-    #             }
-    #         }
-    #     ]
-    #     if filter_only_us
-    #     else None
-    # )
-
     try:
         async with ForgivingTaskGroup() as tg:
             for extractor_name, kw in keywords.items():
@@ -147,7 +133,6 @@ async def get_relevant(
                         kw,
                         num_of_docs=50,
                         timeout=90,
-                        # additional_shoulds=addition
                     )
                 )
     except* Exception as exs:
@@ -226,11 +211,10 @@ async def test_different_vectors(
 async def test_translation(
     data_keywords: dict[str, list[list[str]]],
     api: LoaderBase,
-    translator: TranslatorBase,
+    translators: list[TranslatorBase],
     nums_of_translations: list[int] = [3],
     num_of_relevant: int = 35,
     timeout: int = 30,
-    # filter_only_us: bool = False,
 ) -> dict[str, list[str]]:
 
     relevant = {}
@@ -240,39 +224,61 @@ async def test_translation(
     for (extractor_name, term_vec_vec), num in methods:
         # name = "_".join([extractor_name, str(num)])
         name = extractor_name
-        try:
+        for translator in translators:
+            try:
 
-            # addition = (
-            #     [
-            #         {
-            #             "query_string": {
-            #                 "query": "US",
-            #                 "fields": ["id", "common.publishing_office"],
-            #                 "boost": 100.0,
-            #             }
-            #         }
-            #     ]
-            #     if filter_only_us
-            #     else None
-            # )
+                trans = await translator.translate_list(
+                    term_vec_vec[0], num_of_suggestions=num
+                )
+                tv = list(
+                    map(lambda x: "".join(re.findall(r"[A-Za-zа-яА-ЯёЁ -]", x)), trans)
+                )
+                tv = list(compress(tv, tv))
+                if len(tv) < 2:
+                    logger.error("Empty translations list in %s" % name)
+                    continue
+                relevant[name + "_" + translator.name] = (
+                    await api.find_relevant_by_keywords(
+                        tv,
+                        num_of_docs=num_of_relevant,
+                        timeout=timeout,
+                    )
+                )
+
+            except Exception as ex:
+                logger.error("Exception in test_translation - %s" % str(ex))
+
+    return relevant
+
+
+async def get_translations(
+    data_keywords: dict[str, list[list[str]]],
+    translators: list[TranslatorBase],
+    nums_of_translations: list[int] = [3],
+) -> dict[str, list[str]]:
+
+    methods = product(data_keywords.items(), nums_of_translations, translators)
+
+    out = {}
+
+    for (extractor_name, term_vec_vec), num, translator in methods:
+        name = "_".join([extractor_name, translator.name, str(num)])
+        # name = extractor_name
+        try:
 
             trans = await translator.translate_list(
                 term_vec_vec[0], num_of_suggestions=num
             )
-            trans = trans["same_pos"]
-            tv = list(map(lambda x: "".join(re.findall(r"[A-Za-zа-яА-Я-]", x)), trans))
+            tv = list(
+                map(lambda x: "".join(re.findall(r"[A-Za-zа-яА-ЯёЁ -]", x)), trans)
+            )
             tv = list(compress(tv, tv))
             if len(tv) < 2:
                 logger.error("Empty translations list in %s" % name)
                 continue
-            relevant[name] = await api.find_relevant_by_keywords(
-                tv,
-                num_of_docs=num_of_relevant,
-                timeout=timeout,
-                # additional_shoulds=addition,
-            )
+            out[name] = [tv]
 
         except Exception as ex:
             logger.error("Exception in test_translation - %s" % str(ex))
 
-    return relevant
+    return out

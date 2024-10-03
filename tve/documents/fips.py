@@ -3,6 +3,7 @@ import logging
 import random
 import re
 import xml.etree.ElementTree as ET
+from functools import cached_property
 from itertools import compress
 from pathlib import Path
 
@@ -22,12 +23,12 @@ class FIPSDocument(DocumentBase):
             raw = json.loads(raw)
         self.raw_json = raw
 
-    @property
+    @cached_property
     def cluster(self) -> list[str]:
         cluster = [self.id_date] + self.raw_json.get("cluster", []) + self.citations
         return list(dict.fromkeys(cluster))
 
-    @property
+    @cached_property
     def _raw_citation_field(self) -> str:
         biblio = self.raw_json.get("biblio", {})
         bib = biblio.get("ru", None)
@@ -37,14 +38,14 @@ class FIPSDocument(DocumentBase):
                 return ""
         return bib.get("citations", "")
 
-    @property
+    @cached_property
     def citations(self) -> list[str]:
         cites = [i["id"] for i in self.raw_json["common"].get("citated_docs", [])]
         # "biblio": {"ru": {"citations":
         cites += extract_citaions(self._raw_citation_field)
         return list(dict.fromkeys(cites))
 
-    @property
+    @cached_property
     def description(self) -> str:
         json_block = self.raw_json.get("description", {})
         json_text = json_block.get("ru", None)
@@ -57,7 +58,7 @@ class FIPSDocument(DocumentBase):
         else:
             return ""
 
-    @property
+    @cached_property
     def abstract(self) -> str:
         json_block = self.raw_json.get("abstract", {})
         json_text = json_block.get("ru", None)
@@ -70,7 +71,7 @@ class FIPSDocument(DocumentBase):
         else:
             return ""
 
-    @property
+    @cached_property
     def claims(self) -> str:
         json_block = self.raw_json.get("claims", {})
         json_text = json_block.get("ru", None)
@@ -90,11 +91,11 @@ class FIPSDocument(DocumentBase):
         else:
             return ""
 
-    @property
+    @cached_property
     def text(self) -> str:
         return " ".join([self.abstract, self.claims, self.description])
 
-    @property
+    @cached_property
     def id(self) -> str:
         out = self.raw_json.get("id", "")
         out = out.split("_")[0]
@@ -105,7 +106,7 @@ class FIPSDocument(DocumentBase):
             out = pub_off + doc_num.lstrip("0") + kind
         return out
 
-    @property
+    @cached_property
     def date(self) -> str:
         date = self.raw_json["common"]["publication_date"]
         split_date = re.split(r"[ .,/\\-]", date)
@@ -132,7 +133,7 @@ class FIPSAPILoader(LoaderBase):
     def __init__(self, api_key) -> None:
         self.api_key = api_key
 
-    @property
+    @cached_property
     def _headers(self) -> dict:
         return {
             "Authorization": f"Bearer {self.api_key}",

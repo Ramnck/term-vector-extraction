@@ -1,6 +1,7 @@
 import re
 import xml.etree.ElementTree as ET
 from enum import StrEnum
+from functools import cached_property
 from pathlib import Path
 
 from ..base import DocumentBase
@@ -20,7 +21,7 @@ class XMLDocument(DocumentBase):
         else:
             self.xml_obj = ET.fromstring(raw)
 
-    @property
+    @cached_property
     def _freeformat_citations_field(self) -> str:
         tag = self.xml_obj.find(XMLDocument.Namespace.pat + "BibliographicData")
         tag = tag.find(XMLDocument.Namespace.pat + "ReferenceCitationBag")
@@ -37,7 +38,7 @@ class XMLDocument(DocumentBase):
 
         return citations
 
-    @property
+    @cached_property
     def citations(self) -> list[str]:
         citations_free = self._freeformat_citations_field
 
@@ -89,7 +90,7 @@ class XMLDocument(DocumentBase):
 
         return citations
 
-    @property
+    @cached_property
     def description(self) -> str:
         description = self.xml_obj.find(XMLDocument.Namespace.pat + "Description")
         if description is None:
@@ -97,7 +98,7 @@ class XMLDocument(DocumentBase):
         description = " ".join([i.text for i in description if i.text is not None])
         return description
 
-    @property
+    @cached_property
     def claims(self) -> str:
         claims_root = self.xml_obj.find(XMLDocument.Namespace.pat + "Claims")
 
@@ -113,7 +114,7 @@ class XMLDocument(DocumentBase):
 
         return " ".join(claims)
 
-    @property
+    @cached_property
     def abstract(self) -> str:
         abstracts = []
         for abstract in self.xml_obj.findall(XMLDocument.Namespace.pat + "Abstract"):
@@ -123,11 +124,11 @@ class XMLDocument(DocumentBase):
 
         return " ".join(abstracts)
 
-    @property
+    @cached_property
     def text(self) -> str:
         return " ".join([self.description, self.claims, self.abstract])
 
-    @property
+    @cached_property
     def id(self) -> str:
         def extract_id(tag: ET.Element) -> str:
             c = tag.find(XMLDocument.Namespace.com + "IPOfficeCode")
@@ -155,7 +156,7 @@ class XMLDocument(DocumentBase):
 
         return id_temp
 
-    @property
+    @cached_property
     def date(self) -> str:
         tag = self.xml_obj.find(XMLDocument.Namespace.com + "PublicationDate")
         if tag is None:
@@ -170,7 +171,7 @@ class XMLDocument(DocumentBase):
             tag = tag.find(XMLDocument.Namespace.com + "PublicationDate")
         return tag.text
 
-    @property
+    @cached_property
     def cluster(self) -> list[str]:
         xml = self.xml_obj
         out = list()

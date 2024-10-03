@@ -10,11 +10,15 @@ from pathlib import Path
 
 import aiofiles
 import numpy as np
+
+# from langchain_openai.chat_models import ChatOpenAI
+from langchain_community.chat_models import GigaChat
 from tqdm import tqdm
 from tqdm.asyncio import tqdm_asyncio
 
 from tve.base import LoaderBase
-from tve.documents import FileSystem, FipsAPI, InternalESAPI
+
+# from tve.documents import FSLoader, FIPSAPILoader, ESAPILoader
 from tve.pipeline import (
     BASE_DATA_PATH,
     ES_URL,
@@ -24,7 +28,9 @@ from tve.pipeline import (
     get_relevant,
     test_different_vectors,
 )
-from tve.translators.promt import PROMTTranslator
+
+# from tve.translators.promt import PROMTTranslator
+from tve.translators.langchain import LangChainTranslator
 from tve.utils import (
     ForgivingTaskGroup,
     batched,
@@ -32,36 +38,73 @@ from tve.utils import (
     save_data_to_json,
 )
 
+logging.getLogger("openai._base_client").setLevel(logging.WARN)
+logging.getLogger("httpx").setLevel(logging.WARN)
+
+# chatgpt = ChatOpenAI(
+#     model="gpt-4o-mini",
+#     temperature=0.5,
+#     max_tokens=None,
+#     timeout=None,
+# )
+
+giga = GigaChat(
+    streaming=True, scope="GIGACHAT_API_PERS", model="GigaChat", verify_ssl_certs=False
+)
+
 translators = [
+    # LangChainTranslator(chatgpt, name="gpt-4o-mini"),
+    LangChainTranslator(giga, "giga", "ru"),
     # LLMTranslator(),
-    PROMTTranslator()
+    # PROMTTranslator(),
 ]
 
 logger = logging.getLogger(__name__)
 
 
-async def process_document(data_dict: dict, dir_path: Path):
+async def process_document(
+    data_dict: dict,
+    dir_path: Path,
+    skip_done: bool = False,
+    rewrite: bool = True,
+    sleep_time: float = 0.0,
+):
 
     raw_keywords = data_dict["keywords"].copy()
     del data_dict["keywords"]
 
+    outfile_path = dir_path / (data_dict["doc_id"] + ".json")
+
+    nums = [2, 3]
+
     keywords = {}
     for k, v in raw_keywords.items():
-        keywords[k] = v[0][:50]
+        if k in ["YAKE"]:
+            keywords[k] = v[0][:50]
 
-    new_keywords = {}
-    for k, v in keywords.items():
+    old_data = (await load_data_from_json(outfile_path)) if rewrite else None
+
+    new_keywords = old_data.get("keywords", {}) if old_data else {}
+
+    for extractor_name, kws in keywords.items():
         for translator in translators:
-            data = await translator.translate(v)
-            for tr_name, tr in data.items():
+            for num in nums:
+                name = [extractor_name, translator.name]
+                if len(nums) > 1:
+                    name.append(str(num))
+                name = "_".join(name)
 
-                new_keywords[k + "_" + translator.get_name() + "_" + tr_name] = v + tr
+                if skip_done and name in new_keywords.keys():
+                    continue
+
+                tr = await translator.translate_list(kws, num_of_suggestions=num)
+                new_keywords[name] = [tr]
 
     data_dict["keywords"] = new_keywords
 
-    file_path = dir_path / (data_dict["doc_id"] + ".json")
-    if await save_data_to_json(data_dict, file_path):
-        raise RuntimeError("Error saving file %s" % file_path)
+    if await save_data_to_json(data_dict, outfile_path):
+        raise RuntimeError("Error saving file %s" % outfile_path)
+    time.sleep(sleep_time)
 
 
 async def main(
@@ -70,6 +113,9 @@ async def main(
     input_path: str,
     output_path: str | None,
     num_of_workers: int,
+    skip_done: bool = False,
+    rewrite: bool = True,
+    sleep_time: float = 0.0,
 ):
 
     dir_path = BASE_DATA_PATH / "eval" / input_path
@@ -79,17 +125,12 @@ async def main(
     # methods = ["raw"]
     # lens_of_vec = [125, 150, 175, 200]
 
-    progress_bar = tqdm(desc="Progress", total=num_of_docs)
+    progress_bar = tqdm(desc="Progress", total=len(doc_paths))
+    os.makedirs(BASE_DATA_PATH / "eval" / output_path, exist_ok=True)
 
     for doc_path_batch in batched(doc_paths, n=num_of_workers):
         # try:
-        async with ForgivingTaskGroup() as tg:
-
-            def new_on_task_done(task):
-                asyncio.TaskGroup._on_task_done(tg, task)
-                progress_bar.update(1)
-
-            tg._on_task_done = new_on_task_done
+        async with ForgivingTaskGroup(progress_bar=progress_bar) as tg:
 
             for doc_path in doc_path_batch:
 
@@ -100,7 +141,13 @@ async def main(
                 # )
 
                 tg.create_task(
-                    process_document(data, BASE_DATA_PATH / "eval" / output_path)
+                    process_document(
+                        data,
+                        BASE_DATA_PATH / "eval" / output_path,
+                        skip_done=skip_done,
+                        rewrite=rewrite,
+                        sleep_time=sleep_time,
+                    )
                 )
 
     # except* Exception as exs:
@@ -118,7 +165,10 @@ if __name__ == "__main__":
     parser.add_argument("-i", "--input", default="500")
     parser.add_argument("-o", "--output", default="500_trans")
     parser.add_argument("-n", "--number", default=500, type=int)
-    parser.add_argument("-w", "--num-of-workers", default=2, type=int)
+    parser.add_argument("-w", "--num-of-workers", default=5, type=int)
+    parser.add_argument("--no-rewrite", action="store_true", default=False)
+    parser.add_argument("--skip", "--skip-done", action="store_true", default=False)
+    parser.add_argument("--sleep", type=float, default=0.0)
 
     args = parser.parse_args()
 
@@ -126,5 +176,13 @@ if __name__ == "__main__":
     # api = InternalESAPI(ES_URL)
     # loader = FileSystem(Path("data") / "raw" / args.docs)
 
-    coro = main(args.number, args.input, args.output, args.num_of_workers)
+    coro = main(
+        args.number,
+        args.input,
+        args.output,
+        args.num_of_workers,
+        skip_done=args.skip,
+        rewrite=not args.no_rewrite,
+        sleep_time=args.sleep,
+    )
     asyncio.run(coro)

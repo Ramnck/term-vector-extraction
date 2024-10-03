@@ -11,3 +11,4 @@ main copy*
 log.txt
 .vscode
 script.cmd
+env

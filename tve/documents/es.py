@@ -1,5 +1,6 @@
 import logging
 import re
+from functools import cached_property
 from itertools import compress, product
 
 import aiohttp

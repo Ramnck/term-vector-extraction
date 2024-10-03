@@ -53,7 +53,7 @@ class PROMTTranslator(TranslatorBase):
         self, word: str, translations: list[str], num_words: int = 2
     ) -> dict[str, list[str]]:
 
-        data = {"same_pos": [], "diff_pos": []}
+        data = []
 
         w_tags = pos_tags_ru(word, simplify=True)
 
@@ -70,17 +70,8 @@ class PROMTTranslator(TranslatorBase):
 
         tmp = {k: v.copy() for k, v in pos_word_dict.items()}
         for pos in pos_priority:
-            while len(data["same_pos"]) < num_words and len(tmp.get(pos, [])) > 0:
-                data["same_pos"].append(tmp[pos].pop(0))
-
-        tmp = {k: v.copy() for k, v in pos_word_dict.items()}
-        for pos in pos_priority:
-            try:
-                data["diff_pos"].append(tmp[pos].pop(0))
-            except:
-                pass
-            if len(data["diff_pos"]) >= num_words:
-                break
+            while len(data) < num_words and len(tmp.get(pos, [])) > 0:
+                data.append(tmp[pos].pop(0))
 
         return data
 
