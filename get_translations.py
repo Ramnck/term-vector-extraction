@@ -13,6 +13,7 @@ import numpy as np
 
 # from langchain_openai.chat_models import ChatOpenAI
 from langchain_community.chat_models import GigaChat
+from langchain_community.llms.yandex import YandexGPT
 from tqdm import tqdm
 from tqdm.asyncio import tqdm_asyncio
 
@@ -42,7 +43,7 @@ logging.getLogger("openai._base_client").setLevel(logging.WARN)
 logging.getLogger("httpx").setLevel(logging.WARN)
 
 # chatgpt = ChatOpenAI(
-#     model="gpt-4o-mini",
+#     model="gpt-4o-mini-2024-07-18",
 #     temperature=0.5,
 #     max_tokens=None,
 #     timeout=None,
@@ -52,9 +53,14 @@ giga = GigaChat(
     streaming=True, scope="GIGACHAT_API_PERS", model="GigaChat", verify_ssl_certs=False
 )
 
+yandex = YandexGPT(
+    model_uri=f"gpt://{os.getenv('YANDEX_FOLDER_ID')}/yandexgpt-lite/latest"
+)
+
 translators = [
     # LangChainTranslator(chatgpt, name="gpt-4o-mini"),
     LangChainTranslator(giga, "giga", "ru"),
+    LangChainTranslator(yandex, "yandex", "ru"),
     # LLMTranslator(),
     # PROMTTranslator(),
 ]

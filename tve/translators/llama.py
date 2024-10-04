@@ -4,7 +4,7 @@ import logging
 import os
 import re
 
-os.environ["TF_ENABLE_ONEDNN_OPTS"] = 0
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 import aiohttp
 from llama_cpp import Llama
 

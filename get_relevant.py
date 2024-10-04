@@ -3,6 +3,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import sys
 import time
 from itertools import product
@@ -79,18 +80,27 @@ async def main(
                     #     data["keywords"], methods, lens_of_vec, api, timeout=180
                     # )
 
+                    # kws = {
+                    # k: data["keywords"][k]
+                    # for k in ["YAKE", "jina", "e5-large", "iteco"]
+                    # }
+                    # kws = data["keywords"]
+                    # rel_coro = test_translation(
+                    # kws, api, translator, num_of_relevant=50
+                    # )
+
+                    def clean_func(word):
+                        match = re.findall(
+                            r"([А-Яа-яA-Za-zёЁ]+)(-[А-Яа-яA-Za-zёЁ]+)?", word
+                        )
+                        return " ".join(("".join(i) for i in match))
+
                     kws = {
-                        k: data["keywords"][k]
-                        for k in ["YAKE", "jina", "e5-large", "iteco"]
+                        k: list(map(clean_func, v[0]))
+                        for k, v in data["keywords"].items()
                     }
 
-                    rel_coro = test_translation(
-                        kws, api, translator, num_of_relevant=50
-                    )
-
-                    # kws = {k: v[0] for k, v in data["keywords"].items()}
-
-                    # rel_coro = get_relevant(kws, api)
+                    rel_coro = get_relevant(kws, api)
 
                     tg.create_task(
                         process_document(

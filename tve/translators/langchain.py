@@ -2,12 +2,25 @@ import json
 import logging
 
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 
 from ..base import TranslatorBase
 from .prompts import en_promt, ru_promt
 
 logger = logging.getLogger(__name__)
+
+# from.llama import Llama
+
+# model = Llama(
+#             model_path="E:\\models\\ggufs\\gemma-2-2b-it-Q8_0.gguf",
+#             verbose=False,
+#             n_ctx=0,
+#             n_gpu_layers=-1,
+#             n_threads=6,
+#             n_threads_batch=2,  # Uncomment to use GPU acceleration
+#             # seed=1337, # Uncomment to set a specific seed
+#             # n_ctx=2048, # Uncomment to increase the context window
+#         )
 
 
 class LangChainTranslator(TranslatorBase):
@@ -47,13 +60,19 @@ class LangChainTranslator(TranslatorBase):
             HumanMessage(self.human_promt(", ".join(words))),
         ]
 
-        chunks = [chunk.content async for chunk in self.llm.astream(messages)]
+        chunks = [
+            chunk.content if isinstance(chunk, BaseMessage) else chunk
+            async for chunk in self.llm.astream(messages)
+        ]
         text = "".join(chunks)
         try:
             json_answer = json.loads(text)
         except json.JSONDecodeError:
-            json_answer = {}
-            logger.error("Error in translate_list: %s" % text)
+            try:
+                json_answer = json.loads(text[text.index("{") : text.rindex("}") + 1])
+            except json.JSONDecodeError:
+                json_answer = {}
+                logger.error("Error in translate_list: %s" % text)
         try:
             out = sum(json_answer.values(), [])
         except TypeError:
