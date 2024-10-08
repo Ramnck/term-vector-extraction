@@ -10,7 +10,7 @@ from llama_cpp import Llama
 
 from ..base import TranslatorBase
 from ..utils import ForgivingTaskGroup
-from .prompts import en_promt, ru_promt
+from .prompts import en_translate, ru_translate
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +36,8 @@ class LlamaTranslator(TranslatorBase):
         self, words: list[str], num_of_suggestions: int = 2, **kwargs
     ) -> list[str]:
 
-        default_prompt = ru_promt
-        # default_prompt = en_promt
+        default_prompt = ru_translate
+        # default_prompt = en_translate
 
         role = default_prompt.role
         task = default_prompt.task.format(num_of_suggestions)

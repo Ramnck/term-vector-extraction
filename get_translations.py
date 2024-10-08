@@ -32,6 +32,7 @@ from tve.pipeline import (
 
 # from tve.translators.promt import PROMTTranslator
 from tve.translators.langchain import LangChainTranslator
+from tve.translators.prompts import PromptTemplate, en_expand_prompt, ru_expand_prompt
 from tve.utils import (
     ForgivingTaskGroup,
     batched,
@@ -53,14 +54,16 @@ giga = GigaChat(
     streaming=True, scope="GIGACHAT_API_PERS", model="GigaChat", verify_ssl_certs=False
 )
 
+# yc iam create-token
 yandex = YandexGPT(
     model_uri=f"gpt://{os.getenv('YANDEX_FOLDER_ID')}/yandexgpt-lite/latest"
 )
 
+
 translators = [
-    # LangChainTranslator(chatgpt, name="gpt-4o-mini"),
-    LangChainTranslator(giga, "giga", "ru"),
-    LangChainTranslator(yandex, "yandex", "ru"),
+    # LangChainTranslator(chatgpt, name="gpt-4o-mini", default_prompt=en_expand_prompt),
+    LangChainTranslator(giga, "giga", default_prompt=ru_expand_prompt),
+    LangChainTranslator(yandex, "yandex", "ru", default_prompt=ru_expand_prompt),
     # LLMTranslator(),
     # PROMTTranslator(),
 ]
@@ -81,7 +84,8 @@ async def process_document(
 
     outfile_path = dir_path / (data_dict["doc_id"] + ".json")
 
-    nums = [2, 3]
+    # nums = [2, 3]
+    nums = [3]
 
     keywords = {}
     for k, v in raw_keywords.items():
@@ -95,16 +99,19 @@ async def process_document(
     for extractor_name, kws in keywords.items():
         for translator in translators:
             for num in nums:
-                name = [extractor_name, translator.name]
-                if len(nums) > 1:
-                    name.append(str(num))
+                name = []
+                # name.append(extractor_name)
+                name.append(translator.name)
+                # if len(nums) > 1:
+                #     name.append(str(num))
                 name = "_".join(name)
 
                 if skip_done and name in new_keywords.keys():
                     continue
 
                 tr = await translator.translate_list(kws, num_of_suggestions=num)
-                new_keywords[name] = [tr]
+                # new_keywords[name] = [tr]
+                new_keywords[name] = [kws + tr]
 
     data_dict["keywords"] = new_keywords
 
@@ -166,10 +173,10 @@ async def main(
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
-        description="Get relevant using term vectors vectors"
+        description="Get translations using term vectors vectors"
     )
-    parser.add_argument("-i", "--input", default="500")
-    parser.add_argument("-o", "--output", default="500_trans")
+    parser.add_argument("-i", "--input", required=True)
+    parser.add_argument("-o", "--output", default=None)
     parser.add_argument("-n", "--number", default=500, type=int)
     parser.add_argument("-w", "--num-of-workers", default=5, type=int)
     parser.add_argument("--no-rewrite", action="store_true", default=False)
@@ -181,6 +188,9 @@ if __name__ == "__main__":
     # api = FipsAPI(FIPS_API_KEY)
     # api = InternalESAPI(ES_URL)
     # loader = FileSystem(Path("data") / "raw" / args.docs)
+
+    if args.output is None:
+        args.output = args.input + "_trans"
 
     coro = main(
         args.number,

@@ -2,11 +2,17 @@ from dataclasses import dataclass
 
 
 @dataclass
-class DefaultPrompt:
+class PromptTemplate:
     role: str
     task: str
     answer_format: str
     tail: str
+
+    def __str__(self) -> str:
+        return " ".join([self.role, self.task, self.answer_format, self.tail, ""])
+
+    def __repr__(self) -> str:
+        return self.__str__()
 
 
 role_ru = "Ты - помощник переводчика."
@@ -22,9 +28,23 @@ answer_format_en = 'Give me the answer in JSON format where key is word to trans
 tail_ru = "Набор слов:"
 tail_en = "Set of words:"
 
-en_promt = DefaultPrompt(
+en_translate = PromptTemplate(
     role=role_en, task=task_en, answer_format=answer_format_en, tail=tail_en
 )
-ru_promt = DefaultPrompt(
+ru_translate = PromptTemplate(
     role=role_ru, task=task_ru, answer_format=answer_format_ru, tail=tail_ru
 )
+
+r = "You are a copywriter assistant."
+t = "You are given a set of words/phrases, your task is to suggest {} synonyms or words/phrases with similar or close meaning, try to offer the most diverse candidates. Take into account all the words to understand the general theme of the set of words."
+ans = 'Give me the answer in JSON format where key is input word/phras, value is list of suggestions. Example: {"<word/phrase>": [<list of suggestions>]}.'
+e = "Here is set of words/phrases:"
+
+en_expand_prompt = PromptTemplate(role=r, task=t, answer_format=ans, tail=e)
+
+r = "Вы - помощник копирайтера текстов описаний изобретений."
+t = "Вам дан набор слов/фраз, ваша задача - предложить {} синонимa или слова/фразы с похожим или близким по смыслу значением, постарайтесь предложить наиболее разнообразные варианты. Учитывайте все слова, чтобы понять общую тему набора слов. Предлагайте слова/фразы на английском языке."
+ans = "Дайте мне ответ в формате JSON, где ключ - входное слово/фраза, значение - список предложений. Пример: {«<слово/фраза>»: [<список предложений>]}."
+e = "Вот список слов/фраз:"
+
+ru_expand_prompt = PromptTemplate(role=r, task=t, answer_format=ans, tail=e)

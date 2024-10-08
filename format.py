@@ -12,6 +12,8 @@ from pathlib import Path
 from tve.pipeline import BASE_DATA_PATH
 from tve.utils import load_data_from_json
 
+logger = logging.getLogger(__name__)
+
 
 def format_id(pat_id: str) -> str:
     pattern = r"([A-Z]{2})(\d+)([A-ZА-Я]\d?)_(\d+)"
@@ -25,17 +27,13 @@ def format_id(pat_id: str) -> str:
     return out
 
 
-async def main(
-    input_path: str,
-    output_path: str | None,
-):
+async def main(input_path: str, output_path: str | None, priority: bool = False):
     input_dir_path = BASE_DATA_PATH / "eval" / input_path
     dir_path = BASE_DATA_PATH / "eval" / output_path
 
     for file_path in input_dir_path.iterdir():
         data = await load_data_from_json(file_path)
-        doc_id = data["doc_id"]
-        doc_analog = data.get("cluster", ["", ""])[1]
+        doc_id = data["doc_id"] if not priority else data.get("cluster", ["", ""])[1]
         all_relevant = data["relevant"]
 
         for method_name, relevant in all_relevant.items():
@@ -49,13 +47,12 @@ async def main(
                 number = len(list(result_path.iterdir()))
                 name_of_result = f"result_list{number}.txt"
                 file.write(f"{doc_id} {name_of_result}\n")
-                # file.write(f"{doc_analog} {name_of_result}\n")
             with open(result_path / name_of_result, "w+", encoding="utf-8") as file:
                 for res in relevant:
                     try:
                         file.write(format_id(res) + "\n")
                     except Exception as ex:
-                        print(res)
+                        logger.error(f"Error in main: {res}")
                         # raise ex
 
 
@@ -66,11 +63,13 @@ if __name__ == "__main__":
     )
     parser.add_argument("-i", "--input", required=True)
     parser.add_argument("-o", "--output", required=True)
+    parser.add_argument("--priority", action="store_true", default=False)
 
     args = parser.parse_args()
 
     coro = main(
         args.input,
         args.output,
+        args.priority,
     )
     asyncio.run(coro)
