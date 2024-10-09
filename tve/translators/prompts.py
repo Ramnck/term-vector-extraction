@@ -35,15 +35,15 @@ ru_translate = PromptTemplate(
     role=role_ru, task=task_ru, answer_format=answer_format_ru, tail=tail_ru
 )
 
-r = "You are a copywriter assistant."
-t = "You are given a set of words/phrases, your task is to suggest {} synonyms or words/phrases with similar or close meaning, try to offer the most diverse candidates. Take into account all the words to understand the general theme of the set of words."
+r = "You are an assistant patent attorney."
+t = "You are given a set of words/phrases from patent application, your task is to suggest {} synonyms or words/phrases with similar or close meaning, try to offer the most diverse options from those used in technical texts and/or patent documents. Take into account all the words to understand the general theme of the set of words."
 ans = 'Give me the answer in JSON format where key is input word/phras, value is list of suggestions. Example: {"<word/phrase>": [<list of suggestions>]}.'
 e = "Here is set of words/phrases:"
 
 en_expand_prompt = PromptTemplate(role=r, task=t, answer_format=ans, tail=e)
 
-r = "Вы - помощник копирайтера текстов описаний изобретений."
-t = "Вам дан набор слов/фраз, ваша задача - предложить {} синонимa или слова/фразы с похожим или близким по смыслу значением, постарайтесь предложить наиболее разнообразные варианты. Учитывайте все слова, чтобы понять общую тему набора слов. Предлагайте слова/фразы на английском языке."
+r = "Вы являетесь помощником патентного поверенного."
+t = "Вам дан набор слов/фраз из патентной заявки, ваша задача - предложить {} синонимa или слова/фразы с похожим или близким по смыслу значением, постарайтесь предложить наиболее разнообразные варианты из тех, которые используются в технических текстах и/или патентных документах. Учитывайте все слова, чтобы понять общую тему набора слов. Предлагайте слова/фразы на английском языке."
 ans = "Дайте мне ответ в формате JSON, где ключ - входное слово/фраза, значение - список предложений. Пример: {«<слово/фраза>»: [<список предложений>]}."
 e = "Вот список слов/фраз:"
 
