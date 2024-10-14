@@ -11,11 +11,15 @@ from ..lexis import (
 
 
 class YAKExtractor(KeyWordExtractorBase):
-    def __init__(self, dedupLim=0.9) -> None:
+    def __init__(self, dedupLim=0.9, max_ngram_size: int = 1) -> None:
         self.model = None
         self.name = "YAKE"
         self.y = yake.KeywordExtractor(
-            lan="ru", n=1, dedupLim=dedupLim, top=200, stopwords=stopwords_ru
+            lan="ru",
+            n=max_ngram_size,
+            dedupLim=dedupLim,
+            top=200,
+            stopwords=stopwords_ru,
         )
 
     def get_keywords(self, doc: DocumentBase, num: int = 50, **kwargs) -> list[str]:

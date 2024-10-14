@@ -6,6 +6,7 @@ import sys
 import time
 from itertools import compress, product
 from pathlib import Path
+from typing import Union
 
 from dotenv import load_dotenv
 
@@ -16,7 +17,7 @@ from .lexis import (
     lemmatize_ru_word,
     make_extended_term_vec,
 )
-from .utils import ForgivingTaskGroup, batched
+from .utils import ForgivingTaskGroup, batched, flatten_kws
 
 name = [Path(sys.argv[0]).name] + sys.argv[1:]
 filename = " ".join(name)
@@ -120,7 +121,7 @@ async def extract_keywords_from_docs(
 
 
 async def get_relevant(
-    keywords: dict[str, list[str]],
+    keywords: dict[str, Union[str, list, dict]],
     api: LoaderBase,
 ) -> dict[str, list[str]]:
     relevant = {}
@@ -130,7 +131,7 @@ async def get_relevant(
             for extractor_name, kw in keywords.items():
                 relevant[extractor_name] = tg.create_task(
                     api.find_relevant_by_keywords(
-                        kw,
+                        flatten_kws(kw),
                         num_of_docs=50,
                         timeout=90,
                     )

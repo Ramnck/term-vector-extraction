@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import re
 from functools import cached_property
@@ -61,10 +62,16 @@ class ESAPILoader(LoaderBase):
             for f, l in product(self.fields_without_languages, self.languages)
         ]
 
-    def __del__(self):
-        hosts = self.es.transport.hosts
-        del self.es
-        Elasticsearch(hosts=hosts).close()
+    def close(self):
+        old_loop = asyncio.get_event_loop()
+        if old_loop.is_closed():
+            new_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(new_loop)
+            new_loop.run_until_complete(self.es.close())
+            new_loop.close()
+            asyncio.set_event_loop(old_loop)
+        else:
+            old_loop.run_until_complete(self.es.close())
 
     async def get_document_list_from_range(
         self,
@@ -122,7 +129,6 @@ class ESAPILoader(LoaderBase):
         num_of_docs: int = 35,
         offset: int = 0,
         timeout: int = 30,
-        # additional_shoulds: list[dict] | None = None,
     ) -> list[str]:
         _source_includes = [
             "common.document_number",
@@ -130,13 +136,16 @@ class ESAPILoader(LoaderBase):
             "common.publishing_office",
             "id",
         ]
+
+        query_string = " OR ".join(map(lambda x: f"({x})", kws))
+
         query = {
             "query": {
                 "bool": {
                     "should": [
                         {
                             "query_string": {
-                                "query": " OR ".join(map(lambda x: f"({x})", kws)),
+                                "query": query_string,
                                 "fields": self._fields,
                                 "type": "most_fields",
                                 "default_operator": "OR",
@@ -149,9 +158,6 @@ class ESAPILoader(LoaderBase):
                 }
             }
         }
-
-        # if additional_shoulds:
-        # query["query"]["bool"]["should"] += additional_shoulds
 
         res = await self.es.search(
             index=self.index,
@@ -226,8 +232,6 @@ class ESAPILoader(LoaderBase):
                     }
                 }
             )
-
-        # print(query)
 
         res = await self.es.search(
             index=self.index,

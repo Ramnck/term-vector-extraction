@@ -6,6 +6,7 @@ import numpy as np
 import torch
 from keybert import KeyBERT
 from sentence_transformers import SentenceTransformer
+from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from transformers import (
     AutoModel,
@@ -169,6 +170,7 @@ class KeyBERTModel:
         self,
         doc_embedder: EmbedderBase | SentenceTransformer,
         word_embedder: EmbedderBase | SentenceTransformer | None = None,
+        max_ngram_size: int = 1,
         doc_prefix: str = "",
         word_prefix: str = "",
         **kwargs,
@@ -182,6 +184,7 @@ class KeyBERTModel:
         )
         self.doc_embedder = doc_embedder
         self.encode_kwargs = {"show_progress_bar": False}
+        self._max_ngram_size = max_ngram_size
 
     def extract_doc_embedding(self, doc: str, **kwargs) -> list[list[float]]:
         kwargs.update(self.encode_kwargs)
@@ -216,9 +219,18 @@ class KeyBERTModel:
                      selection of keywords/keyphrases.
         """
 
-        lemmatized_text = lemmatize_doc(document, stopwords_ru_en)
+        # lemmatized_text = lemmatize_doc(document, stopwords_ru_en)
 
-        words = [word for word in set(lemmatized_text) if word]
+        # words = [word for word in set(lemmatized_text) if word]
+
+        count = CountVectorizer(
+            ngram_range=(1, self._max_ngram_size),
+            stop_words=stopwords_ru_en,
+            min_df=1,
+            token_pattern=r"[А-Яа-яA-Za-zёЁ]+-?[А-Яа-яA-Za-zёЁ]*",
+        ).fit([document])
+
+        words = count.get_feature_names_out()
 
         word_embeddings = self.extract_word_embedding(
             words, **kwargs.get("word_embed_kwargs", {})
@@ -252,6 +264,7 @@ class KeyBERTExtractor(KeyWordExtractorBase):
         self,
         model: str | KeyBERTModel | Any | SentenceTransformer,
         method_name: str = "KBRT",
+        max_ngram_size: int = 1,
         text_extraction_func: Callable[[DocumentBase], str] = lambda doc: doc.text,
         doc_prefix: str = "",
         word_prefix: str = "",
@@ -260,13 +273,12 @@ class KeyBERTExtractor(KeyWordExtractorBase):
         self.name = method_name
         if isinstance(model, KeyBERTModel):
             self.model = model
-        elif isinstance(model, SentenceTransformer):
+        elif isinstance(model, (SentenceTransformer, EmbedderBase)):
             self.model = KeyBERTModel(
-                model, doc_prefix=doc_prefix, word_prefix=word_prefix
-            )
-        elif isinstance(model, EmbedderBase):
-            self.model = KeyBERTModel(
-                model, doc_prefix=doc_prefix, word_prefix=word_prefix
+                model,
+                doc_prefix=doc_prefix,
+                word_prefix=word_prefix,
+                max_ngram_size=max_ngram_size,
             )
         else:
             raise RuntimeError("Error in parsing model")

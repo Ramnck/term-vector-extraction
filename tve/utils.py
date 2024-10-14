@@ -1,6 +1,7 @@
 import asyncio
 import json
 from pathlib import Path
+from types import TracebackType
 
 import aiofiles
 from tqdm import tqdm
@@ -10,13 +11,13 @@ class ForgivingTaskGroup(asyncio.TaskGroup):
     _abort = lambda self: None
 
     def __init__(self, progress_bar: tqdm | None = None) -> None:
-        self.progress_bar = progress_bar
+        self._progress_bar = progress_bar
         super().__init__()
 
     def _on_task_done(self, task: asyncio.Task[object]) -> None:
         super(ForgivingTaskGroup, self)._on_task_done(task)
-        if self.progress_bar:
-            self.progress_bar.update(1)
+        if self._progress_bar:
+            self._progress_bar.update(1)
 
 
 def batched(iterable, n=1):
@@ -61,3 +62,17 @@ async def load_data_from_json(path_of_file: Path) -> dict | None:
         return data
     except FileNotFoundError:
         return None
+
+
+def flatten_kws(input_data) -> list[str]:
+    def recursive_unwrap(data):
+        if isinstance(data, dict):
+            return list(data.keys()) + list(
+                sum(map(recursive_unwrap, data.values()), [])
+            )
+        elif isinstance(data, str):
+            return [data]
+        elif isinstance(data, list):
+            return sum(map(recursive_unwrap, data), [])
+
+    return recursive_unwrap(input_data)

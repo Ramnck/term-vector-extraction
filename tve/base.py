@@ -43,7 +43,7 @@ class DocumentBase(ABC):
 class KeyWordExtractorBase(ABC):
     _name = "NOT_IMPL"
 
-    def __init__(self) -> None:
+    def __init__(self, max_ngram_size: int = 1) -> None:
         raise NotImplementedError
 
     def get_keywords(self, doc: DocumentBase, **kwargs) -> list[str]:

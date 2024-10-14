@@ -10,10 +10,7 @@ from pathlib import Path
 
 import aiofiles
 import numpy as np
-
-# from langchain_openai.chat_models import ChatOpenAI
-from langchain_community.chat_models import GigaChat
-from langchain_community.llms.yandex import YandexGPT
+from langchain_openai.chat_models import ChatOpenAI
 from tqdm import tqdm
 from tqdm.asyncio import tqdm_asyncio
 
@@ -36,34 +33,38 @@ from tve.translators.prompts import PromptTemplate, en_expand_prompt, ru_expand_
 from tve.utils import (
     ForgivingTaskGroup,
     batched,
+    flatten_kws,
     load_data_from_json,
     save_data_to_json,
 )
 
+# from langchain_community.chat_models import GigaChat
+# from langchain_community.llms.yandex import YandexGPT
+
 logging.getLogger("openai._base_client").setLevel(logging.WARN)
 logging.getLogger("httpx").setLevel(logging.WARN)
 
-# chatgpt = ChatOpenAI(
-#     model="gpt-4o-mini-2024-07-18",
-#     temperature=0.5,
-#     max_tokens=None,
-#     timeout=None,
+chatgpt = ChatOpenAI(
+    model="gpt-4o-mini-2024-07-18",
+    temperature=0.5,
+    max_tokens=None,
+    timeout=None,
+)
+
+# giga = GigaChat(
+#     streaming=True, scope="GIGACHAT_API_PERS", model="GigaChat", verify_ssl_certs=False
 # )
 
-giga = GigaChat(
-    streaming=True, scope="GIGACHAT_API_PERS", model="GigaChat", verify_ssl_certs=False
-)
-
-# yc iam create-token
-yandex = YandexGPT(
-    model_uri=f"gpt://{os.getenv('YANDEX_FOLDER_ID')}/yandexgpt-lite/latest"
-)
+# # yc iam create-token
+# yandex = YandexGPT(
+#     model_uri=f"gpt://{os.getenv('YANDEX_FOLDER_ID')}/yandexgpt-lite/latest"
+# )
 
 
 translators = [
-    # LangChainTranslator(chatgpt, name="gpt-4o-mini", default_prompt=en_expand_prompt),
-    LangChainTranslator(giga, "giga", default_prompt=ru_expand_prompt),
-    LangChainTranslator(yandex, "yandex", "ru", default_prompt=ru_expand_prompt),
+    LangChainTranslator(chatgpt, name="gpt-4o-mini", default_prompt=en_expand_prompt),
+    # LangChainTranslator(giga, "giga", default_prompt=ru_expand_prompt),
+    # LangChainTranslator(yandex, "yandex", "ru", default_prompt=ru_expand_prompt),
     # LLMTranslator(),
     # PROMTTranslator(),
 ]
@@ -90,28 +91,46 @@ async def process_document(
     keywords = {}
     for k, v in raw_keywords.items():
         if k in ["YAKE"]:
-            keywords[k] = v[0][:50]
+            if isinstance(v[0], list):
+                v = v[0]
+            keywords[k] = v[:50]
 
     old_data = (await load_data_from_json(outfile_path)) if rewrite else None
 
     new_keywords = old_data.get("keywords", {}) if old_data else {}
 
-    for extractor_name, kws in keywords.items():
-        for translator in translators:
-            for num in nums:
-                name = []
-                # name.append(extractor_name)
-                name.append(translator.name)
-                # if len(nums) > 1:
-                #     name.append(str(num))
-                name = "_".join(name)
+    futures = {}
+    try:
+        async with ForgivingTaskGroup() as tg:
+            for extractor_name, kws in keywords.items():
+                for translator in translators:
+                    for num in nums:
+                        name = []
+                        # name.append(extractor_name)
+                        name.append(translator.name)
+                        # if len(nums) > 1:
+                        #     name.append(str(num))
+                        name = "_".join(name)
 
-                if skip_done and name in new_keywords.keys():
-                    continue
+                        if skip_done and name in new_keywords.keys():
+                            continue
 
-                tr = await translator.translate_list(kws, num_of_suggestions=num)
-                # new_keywords[name] = [tr]
-                new_keywords[name] = [kws + tr]
+                        flat_kws = flatten_kws(kws)
+                        tr = tg.create_task(
+                            translator.translate_list(flat_kws, num_of_suggestions=num)
+                        )
+                        # new_keywords[name] = [tr]
+                        futures[name] = tr
+    except* Exception as exs:
+        for ex in exs.exceptions:
+            logger.error(f"Exception in process document - {ex}")
+
+    for name, future in futures.items():
+        try:
+            if future.result() is not None:
+                new_keywords[name] = future.result()
+        except:
+            pass
 
     data_dict["keywords"] = new_keywords
 

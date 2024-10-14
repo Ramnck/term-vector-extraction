@@ -118,7 +118,14 @@ class LangChainTranslator(TranslatorBase):
             json_answer = json.loads(text)
         except json.JSONDecodeError:
             try:
-                text_under_braces = text[text.index("{") : text.rindex("}") + 1]
+                start = text.index("{")
+                try:
+                    end = text.rindex("}") + 1
+                    text_under_braces = text[start:end]
+                except:
+                    end = text.rindex(",", 0, text.rindex("["))
+                    text_under_braces = text[start:end] + "}"
+
                 json_answer = json.loads(text_under_braces)
             except json.JSONDecodeError:
                 try:
@@ -135,8 +142,19 @@ class LangChainTranslator(TranslatorBase):
                 json_answer = {}
                 logger.error("Answer does not obtain json: %s" % text)
         try:
-            out = sum(json_answer.values(), [])
+            out = json_answer
         except TypeError:
             logger.error(f"Error in translate_list sum: {json_answer}")
-            out = []
-        return out
+            out = {}
+
+        formatted_out = {}
+
+        for k, v in out.items():
+            if v is None or len(v) == 0:
+                continue
+            elif isinstance(v, str):
+                formatted_out[k] = [v]
+            elif isinstance(v, list):
+                formatted_out[k] = v
+
+        return formatted_out
