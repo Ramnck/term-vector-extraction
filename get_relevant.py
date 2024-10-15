@@ -32,6 +32,7 @@ from tve.translators.promt import PROMTTranslator
 from tve.utils import (
     ForgivingTaskGroup,
     batched,
+    flatten_kws,
     load_data_from_json,
     save_data_to_json,
 )
@@ -95,10 +96,8 @@ async def main(
                         )
                         return " ".join(("".join(i) for i in match))
 
-                    kws = {
-                        k: list(map(clean_func, v[0]))
-                        for k, v in data["keywords"].items()
-                    }
+                    kws = map(clean_func, flatten_kws(data["keywords"]))
+                    kws = list(kws)
 
                     rel_coro = get_relevant(kws, api)
 
