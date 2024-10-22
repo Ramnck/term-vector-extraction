@@ -39,6 +39,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler(sys.stdout)
+handler.setLevel(logging.INFO)
 handler.setFormatter(logging.Formatter(logging_format))
 logging.getLogger().addHandler(handler)
 
@@ -50,14 +51,17 @@ PROMT_IP = os.getenv("PROMT_IP")
 
 
 async def get_cluster_from_document(
-    doc: DocumentBase, api: LoaderBase, timeout: int = 60
+    doc: DocumentBase,
+    api: LoaderBase,
+    timeout: int = 60,
+    max_docs: int | None = None,
 ) -> list[DocumentBase]:
 
     sub_docs_futures = []
 
     try:
         async with ForgivingTaskGroup() as tg:
-            for sub_doc_id_date in doc.cluster[1:]:
+            for sub_doc_id_date in doc.cluster[1:max_docs]:
                 sub_docs_futures.append(
                     tg.create_task(api.get_doc(sub_doc_id_date, timeout=timeout))
                 )

@@ -3,6 +3,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import sys
 import time
 from itertools import product
@@ -31,6 +32,7 @@ from tve.pipeline import (
 from tve.translators.langchain import LangChainTranslator
 from tve.translators.prompts import PromptTemplate, en_expand_prompt, ru_expand_prompt
 from tve.utils import (
+    CircularTaskGroup,
     ForgivingTaskGroup,
     batched,
     flatten_kws,
@@ -78,6 +80,7 @@ async def process_document(
     skip_done: bool = False,
     rewrite: bool = True,
     sleep_time: float = 0.0,
+    timeout: float = 50,
 ):
 
     raw_keywords = data_dict["keywords"].copy()
@@ -129,6 +132,14 @@ async def process_document(
         try:
             if future.result() is not None:
                 new_keywords[name] = future.result()
+        except RuntimeError as ex:
+            name, text = str(ex).split(";")
+            if isinstance(text, list):
+                text = "".join(text)
+            os.makedirs(dir_path / "errors", exist_ok=True)
+            with open(dir_path / "errors" / (data_dict["doc_id"] + ".txt"), "w") as f:
+                f.write(text)
+            new_keywords[name] = re.findall(r"(?:\")([\w ]+)(?:\"[:,\]])", text)
         except:
             pass
 
@@ -152,7 +163,7 @@ async def main(
 
     dir_path = BASE_DATA_PATH / "eval" / input_path
 
-    doc_paths = list(dir_path.iterdir())[:num_of_docs]
+    doc_paths = [i for i in dir_path.iterdir() if i.is_file()][:num_of_docs]
 
     # methods = ["raw"]
     # lens_of_vec = [125, 150, 175, 200]
@@ -160,27 +171,64 @@ async def main(
     progress_bar = tqdm(desc="Progress", total=len(doc_paths))
     os.makedirs(BASE_DATA_PATH / "eval" / output_path, exist_ok=True)
 
-    for doc_path_batch in batched(doc_paths, n=num_of_workers):
-        # try:
-        async with ForgivingTaskGroup(progress_bar=progress_bar) as tg:
+    # async def coroutine(doc_path):
+    #     data = await load_data_from_json(doc_path)
 
-            for doc_path in doc_path_batch:
+    #     await process_document(
+    #         data,
+    #         BASE_DATA_PATH / "eval" / output_path,
+    #         skip_done=skip_done,
+    #         rewrite=rewrite,
+    #         sleep_time=sleep_time,
+    #         timeout=50,
+    #     )
 
-                data = await load_data_from_json(doc_path)
+    # executor = CircularTaskExecutor(
+    #     map(coroutine, doc_paths), num_of_workers, lambda x: progress_bar.update(1)
+    # )
 
-                # rel_coro = test_different_vectors(
-                #     data["keywords"], methods, lens_of_vec, api, timeout=180
-                # )
+    # await executor.execute()
+    def exception_handler(loop, ctx):
+        ex = ctx["exception"]
+        logger.error(ex)
 
-                tg.create_task(
-                    process_document(
-                        data,
-                        BASE_DATA_PATH / "eval" / output_path,
-                        skip_done=skip_done,
-                        rewrite=rewrite,
-                        sleep_time=sleep_time,
-                    )
+    async with CircularTaskGroup(
+        num_of_workers, lambda x: progress_bar.update(1), exception_handler
+    ) as tg:
+        for doc_path in doc_paths:
+            data = await load_data_from_json(doc_path)
+            await tg.create_task(
+                process_document(
+                    data,
+                    BASE_DATA_PATH / "eval" / output_path,
+                    skip_done=skip_done,
+                    rewrite=rewrite,
+                    sleep_time=sleep_time,
                 )
+            )
+
+    # for doc_path_batch in batched(doc_paths, n=num_of_workers):
+    #     # try:
+    #     async with ForgivingTaskGroup(progress_bar=progress_bar) as tg:
+
+    #         for doc_path in doc_path_batch:
+
+    #             data = await load_data_from_json(doc_path)
+
+    #             # rel_coro = test_different_vectors(
+    #             #     data["keywords"], methods, lens_of_vec, api, timeout=180
+    #             # )
+
+    #             tg.create_task(
+    #                 process_document(
+    #                     data,
+    #                     BASE_DATA_PATH / "eval" / output_path,
+    #                     skip_done=skip_done,
+    #                     rewrite=rewrite,
+    #                     sleep_time=sleep_time,
+    #                     timeout=50,
+    #                 )
+    #             )
 
     # except* Exception as exs:
     #     for ex in exs.exceptions:

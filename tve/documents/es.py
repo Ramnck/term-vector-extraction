@@ -43,7 +43,8 @@ class ESAPILoader(LoaderBase):
             "may22_ep",
             "may22_gb",
         ]
-        self.languages = ["ja", "fr", "ru", "it", "de", "en", "ko", "es"]
+        # self.languages = ["ja", "fr", "ru", "it", "de", "en", "ko", "es"]
+        self.languages = ["ru", "de", "en", "fr"]
         self.fields_without_languages = [
             "biblio.{}.title",
             "abstract_cleaned.{}",
@@ -137,6 +138,10 @@ class ESAPILoader(LoaderBase):
             "id",
         ]
 
+        kws = ["".join(re.findall(r"[a-zA-Zа-яА-ЯёЁ -]", i)).strip() for i in kws]
+
+        kws = compress(kws, kws)
+
         query_string = " OR ".join(map(lambda x: f"({x})", kws))
 
         query = {
@@ -168,10 +173,7 @@ class ESAPILoader(LoaderBase):
             from_=offset,
         )
 
-        docs = [
-            re.sub(r"[^0-9a-zA-Zа-яА-Я_]", "", i["_source"]["id"])
-            for i in res["hits"]["hits"]
-        ]
+        docs = [re.sub(r"с", "", i["_source"]["id"]) for i in res["hits"]["hits"]]
 
         return docs
 
@@ -259,8 +261,11 @@ class ESAPILoader(LoaderBase):
             "id",
             "common.citated_docs",
             "claims",
+            "claims_cleaned",
             "abstract",
+            "abstract_cleaned",
             "description",
+            "description_cleaned",
         ]
 
         for index in self.index:

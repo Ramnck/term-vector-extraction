@@ -1,6 +1,7 @@
 import json
 import logging
 
+from fix_busted_json import repair_json
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 
@@ -105,7 +106,11 @@ class LangChainTranslator(TranslatorBase):
         return prompt
 
     async def translate_list(
-        self, words: list[str], num_of_suggestions: int = 2, **kwargs
+        self,
+        words: list[str],
+        num_of_suggestions: int = 2,
+        noexcept: bool = True,
+        **kwargs,
     ) -> list[str]:
         messages = [
             SystemMessage(self.system_prompt(num_of_suggestions)),
@@ -128,24 +133,28 @@ class LangChainTranslator(TranslatorBase):
 
                 json_answer = json.loads(text_under_braces)
             except json.JSONDecodeError:
+                model_fixed = "model_fixed не присвоено значение"
                 try:
-                    model_fixed = "model_fixed не присвоено значение"
                     model_fixed = await self.fix_json_string(text_under_braces)
                     json_answer = json.loads(model_fixed)
-                except:
-                    json_answer = {}
-                    logger.error(
-                        "Error in translate_list json serialize: %s\n\nMODEL OUTPUT:%s"
-                        % (text, model_fixed)
-                    )
+                except Exception as ex:
+                    if isinstance(ex, json.JSONDecodeError):
+                        text_under_braces = model_fixed
+
+                    try:
+                        json_answer = json.loads(repair_json(text_under_braces))
+                    except:
+                        logger.error(
+                            "Error in translate_list json serialize: %s\n\nMODEL OUTPUT:%s"
+                            % (text, model_fixed)
+                        )
+                        if not noexcept:
+                            raise RuntimeError(self.name + ";" + text_under_braces)
             except ValueError:
                 json_answer = {}
                 logger.error("Answer does not obtain json: %s" % text)
-        try:
-            out = json_answer
-        except TypeError:
-            logger.error(f"Error in translate_list sum: {json_answer}")
-            out = {}
+
+        out = json_answer
 
         formatted_out = {}
 

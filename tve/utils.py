@@ -2,6 +2,7 @@ import asyncio
 import json
 from pathlib import Path
 from types import TracebackType
+from typing import Callable, Iterable
 
 import aiofiles
 from tqdm import tqdm
@@ -20,9 +21,39 @@ class ForgivingTaskGroup(asyncio.TaskGroup):
             self._progress_bar.update(1)
 
 
-def batched(iterable, n=1):
-    l = len(iterable)
+class CircularTaskGroup:
+    def __init__(
+        self,
+        num_of_workers: int,
+        default_callback: Callable | None = None,
+        exception_handler: Callable = lambda loop, ctx: None,
+    ) -> None:
+        self._default_callback = default_callback
+        self._num_of_workers = num_of_workers
+        self._exception_handler = exception_handler
 
+    async def __aenter__(self):
+        self._tasks = []
+        asyncio.get_event_loop().set_exception_handler(self._exception_handler)
+        return self
+
+    async def create_task(self, coroutine):
+        while len(self._tasks) >= self._num_of_workers:
+            self._tasks = [i for i in self._tasks if not i.done()]
+            await asyncio.sleep(0.01)
+        task = asyncio.create_task(coroutine)
+
+        if self._default_callback:
+            task.add_done_callback(self._default_callback)
+        self._tasks.append(task)
+        return task
+
+    async def __aexit__(self, exc_type, exc, tb):
+        await asyncio.wait(self._tasks)
+        asyncio.get_event_loop().set_exception_handler(None)
+
+
+def batched(iterable, n=1):
     iterator = iter(iterable)
     batch = []
     try:

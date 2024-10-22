@@ -30,6 +30,7 @@ from tve.pipeline import (
 )
 from tve.translators.promt import PROMTTranslator
 from tve.utils import (
+    CircularTaskGroup,
     ForgivingTaskGroup,
     batched,
     flatten_kws,
@@ -61,7 +62,7 @@ async def main(
 
     dir_path = BASE_DATA_PATH / "eval" / input_path
 
-    doc_paths = list(dir_path.iterdir())[:num_of_docs]
+    doc_paths = [i for i in dir_path.iterdir() if i.is_file()][:num_of_docs]
     os.makedirs(BASE_DATA_PATH / "eval" / output_path, exist_ok=True)
 
     methods = ["raw"]
@@ -69,49 +70,86 @@ async def main(
 
     progress_bar = tqdm(desc="Progress", total=len(doc_paths))
 
-    for doc_path_batch in batched(doc_paths, n=num_of_workers):
-        try:
-            async with ForgivingTaskGroup(progress_bar) as tg:
+    def exception_handler(loop, ctx):
+        ex = ctx["exception"]
+        logger.error(ex)
 
-                for doc_path in doc_path_batch:
+    async with CircularTaskGroup(
+        num_of_workers, lambda x: progress_bar.update(1), exception_handler
+    ) as tg:
+        for doc_path in doc_paths:
+            data = await load_data_from_json(doc_path)
 
-                    data = await load_data_from_json(doc_path)
+            kws = {k: flatten_kws(v) for k, v in data["keywords"].items()}
 
-                    # rel_coro = test_different_vectors(
-                    #     data["keywords"], methods, lens_of_vec, api, timeout=180
-                    # )
+            rel_coro = get_relevant(kws, api)
 
-                    # kws = {
-                    # k: data["keywords"][k]
-                    # for k in ["YAKE", "jina", "e5-large", "iteco"]
-                    # }
-                    # kws = data["keywords"]
-                    # rel_coro = test_translation(
-                    # kws, api, translator, num_of_relevant=50
-                    # )
+            coro = process_document(
+                rel_coro, data, BASE_DATA_PATH / "eval" / output_path
+            )
 
-                    def clean_func(word):
-                        match = re.findall(
-                            r"([А-Яа-яA-Za-zёЁ]+)(-[А-Яа-яA-Za-zёЁ]+)?", word
-                        )
-                        return " ".join(("".join(i) for i in match))
+            await tg.create_task(coro)
+    # loop = asyncio.get_event_loop()
+    # tasks = []
+    # for doc_path in doc_paths:
+    #     data = await load_data_from_json(doc_path)
 
-                    kws = {
-                        k: list(map(clean_func, flatten_kws(v)))
-                        for k, v in data["keywords"].items()
-                    }
+    #     kws = {
+    #         k: flatten_kws(v)
+    #         for k, v in data["keywords"].items()
+    #     }
 
-                    rel_coro = get_relevant(kws, api)
+    #     rel_coro = get_relevant(kws, api)
 
-                    tg.create_task(
-                        process_document(
-                            rel_coro, data, BASE_DATA_PATH / "eval" / output_path
-                        )
-                    )
+    #     coro = process_document(
+    #             rel_coro, data, BASE_DATA_PATH / "eval" / output_path
+    #         )
 
-        except* Exception as exs:
-            for ex in exs.exceptions:
-                logger.error("Exception in main - %s" % str(ex))
+    #     while [i.get_coro().cr_code.co_name for i in asyncio.all_tasks(loop)].count(coro.cr_code.co_name) >= num_of_workers:
+    #         await asyncio.sleep(0.1)
+
+    #     task = loop.create_task(coro)
+    #     task.add_done_callback(lambda x: progress_bar.update(1))
+
+    # await asyncio.wait(tasks)
+
+    # for doc_path_batch in batched(doc_paths, n=num_of_workers):
+    #     try:
+    #         async with ForgivingTaskGroup(progress_bar) as tg:
+
+    #             for doc_path in doc_path_batch:
+
+    #                 data = await load_data_from_json(doc_path)
+
+    #                 # rel_coro = test_different_vectors(
+    #                 #     data["keywords"], methods, lens_of_vec, api, timeout=180
+    #                 # )
+
+    #                 # kws = {
+    #                 # k: data["keywords"][k]
+    #                 # for k in ["YAKE", "jina", "e5-large", "iteco"]
+    #                 # }
+    #                 # kws = data["keywords"]
+    #                 # rel_coro = test_translation(
+    #                 # kws, api, translator, num_of_relevant=50
+    #                 # )
+
+    #                 kws = {
+    #                     k: flatten_kws(v)
+    #                     for k, v in data["keywords"].items()
+    #                 }
+
+    #                 rel_coro = get_relevant(kws, api)
+
+    #                 tg.create_task(
+    #                     process_document(
+    #                         rel_coro, data, BASE_DATA_PATH / "eval" / output_path
+    #                     )
+    #                 )
+
+    #     except* Exception as exs:
+    #         for ex in exs.exceptions:
+    #             logger.error("Exception in main - %s" % str(ex))
 
     progress_bar.close()
     n_tr = sum(map(lambda x: len(x["tr"]), translator.cache.values()))

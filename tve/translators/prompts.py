@@ -37,17 +37,17 @@ ru_translate = PromptTemplate(
 
 r = "You are an assistant patent attorney."
 t = (
-    "You are given a set of words/phrases from patent application, your task is to suggest {} synonyms or words/phrases with similar or close meaning, try to offer the most diverse options from those used in technical texts and/or patent documents. "
-    "Take into account all the words to understand the general theme of the set of words."
+    "You have been given a set of terms/phrases from a patent application, your task is to suggest {} synonyms or words/phrases most commonly found in technical/patent documents together with each term from the set and contextually close to it, try to suggest the most diverse options. "
+    "Take into account all the words to understand the general theme of the set of terms/phrases."
 )
-ans = 'Give me the answer in JSON format where key is input word/phrase, value is list of suggestions. Example: {"<word/phrase>": [<list of suggestions>]}.'
-e = "Here is set of words/phrases:"
+ans = 'Give me the answer in JSON format where key is input terms/phrases, value is list of suggestions. Example: {"<term/phrase>": [<list of suggestions>]}.'
+e = "Here is set of terms/phrases:"
 
 en_expand_prompt = PromptTemplate(role=r, task=t, answer_format=ans, tail=e)
 
 r = "Вы – помощник патентного поверенного."
 t = (
-    "Вам дан набор слов/фраз из патентной заявки, ваша задача - предложить {} синонимa или слова/фразы с похожим или близким по смыслу значением, постарайтесь предложить наиболее разнообразные варианты из тех, которые используются в технических текстах и/или патентных документах. "
+    "Вам дан набор терминов/фраз из патентной заявки, ваша задача - предложить {} синонимa или слова/фразы, наиболее часто встречающиеся в технических/патентных документах совместно с каждым термином из набора и контекстно близких ему, постарайтесь предложить наиболее разнообразные варианты. "
     "Учитывайте все слова, чтобы понять общую тему набора слов. "
     "Предлагайте слова/фразы на английском языке."
 )

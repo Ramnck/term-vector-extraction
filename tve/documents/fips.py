@@ -47,6 +47,13 @@ class FIPSDocument(DocumentBase):
 
     @cached_property
     def description(self) -> str:
+        json_block = self.raw_json.get("description_cleaned", None)
+        if json_block:
+            json_text = json_block.get("ru", None)
+            if json_text is None:
+                json_text = json_block.get("en", None)
+            return json_text
+
         json_block = self.raw_json.get("description", {})
         json_text = json_block.get("ru", None)
         if json_text is None:
@@ -60,7 +67,15 @@ class FIPSDocument(DocumentBase):
 
     @cached_property
     def abstract(self) -> str:
-        json_block = self.raw_json.get("abstract", {})
+        json_block = self.raw_json.get("abstract_cleaned", None)
+        if json_block:
+            json_text = json_block.get("ru", None)
+            if json_text is None:
+                json_text = json_block.get("en", None)
+            return json_text
+
+        if not json_block:
+            json_block = self.raw_json.get("abstract", {})
         json_text = json_block.get("ru", None)
         if json_text is None:
             json_text = json_block.get("en", None)
@@ -73,6 +88,13 @@ class FIPSDocument(DocumentBase):
 
     @cached_property
     def claims(self) -> str:
+        json_block = self.raw_json.get("claims_cleaned", None)
+        if json_block:
+            json_text = json_block.get("ru", None)
+            if json_text is None:
+                json_text = json_block.get("en", None)
+            return json_text
+
         json_block = self.raw_json.get("claims", {})
         json_text = json_block.get("ru", None)
         if json_text is None:

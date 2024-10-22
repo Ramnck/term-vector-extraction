@@ -57,13 +57,13 @@ logger = logging.getLogger(__name__)
 
 extractors = [
     YAKExtractor(max_ngram_size=2),
-    KeyBERTExtractor(
-        SentenceTransformer("intfloat/multilingual-e5-large"),
-        "e5-large",
-        doc_prefix="passage: ",
-        word_prefix="query: ",
-        max_ngram_size=2,
-    ),
+    # KeyBERTExtractor(
+    #     SentenceTransformer("intfloat/multilingual-e5-large"),
+    #     "e5-large",
+    #     doc_prefix="passage: ",
+    #     word_prefix="query: ",
+    #     max_ngram_size=2,
+    # ),
     # KeyBERTExtractor(
     #     SentenceTransformer("jinaai/jina-embeddings-v3", trust_remote_code=True),
     #     "jina",
@@ -103,11 +103,7 @@ async def process_document(
     rewrite: bool = True,
 ):
 
-    # cluster = await get_cluster_from_document(doc, loader, timeout=180)
-
-    # keywords = await extract_keywords_from_docs(
-    #     cluster, extractors, performance=performance
-    # )
+    cluster = await get_cluster_from_document(doc, loader, timeout=180, max_docs=40)
 
     path_of_file = (
         BASE_DATA_PATH / "eval" / name_of_experiment / (doc.id_date + ".json")
@@ -135,11 +131,22 @@ async def process_document(
     # temp_doc.text = " ".join(map(lambda x: x.text, cluster))
     temp_doc = doc
 
-    for ex in extractors:
-        if rewrite or ex.name not in keywords.keys():
-            if skip_done and ex.name in data.get("keywords", {}).keys():
-                continue
-            keywords[ex.name] = ex.get_keywords(temp_doc, num=50)
+    if skip_done and all(
+        map(lambda x: x.name in data.get("keywords", {}).keys(), extractors)
+    ):
+        return
+
+    new_keywords = await extract_keywords_from_docs(
+        cluster, extractors, performance=performance
+    )
+
+    keywords.update(new_keywords)
+
+    # for ex in extractors:
+    #     if rewrite or ex.name not in keywords.keys():
+    #         if skip_done and ex.name in data.get("keywords", {}).keys():
+    #             continue
+    #         keywords[ex.name] = ex.get_keywords(temp_doc, num=50)
 
     if not keywords[random.choice(extractors).name][0][0]:
         logger.error("Doc  %d has empty kws" % doc.id)
