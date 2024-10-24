@@ -42,9 +42,11 @@ class ESAPILoader(LoaderBase):
             "may22_kr",
             "may22_ep",
             "may22_gb",
+            "may22_ru_apps",
+            "may22f_ru_apps",
         ]
         # self.languages = ["ja", "fr", "ru", "it", "de", "en", "ko", "es"]
-        self.languages = ["ru", "de", "en", "fr"]
+        self.languages = ["ru", "en"]
         self.fields_without_languages = [
             "biblio.{}.title",
             "abstract_cleaned.{}",
@@ -184,16 +186,75 @@ class ESAPILoader(LoaderBase):
         pub_office = match.group(1)
         num_of_doc = match.group(2)
         kind = match.group(3)
-        # date = match.group(4)
+        date = match.group(4)
 
+        docs = await self._search_query(
+            num_of_doc, kind, pub_office, size=3, timeout=timeout
+        )
+
+        if docs:
+            return await self.get_doc_by_id_date(docs[0], timeout)
+        else:
+            return None
+
+    async def get_doc_by_id_date(
+        self, id_date: str, timeout: int = 5
+    ) -> FIPSDocument | None:
         _source_includes = [
             "common.document_number",
             "common.kind",
             "common.publishing_office",
             "common.publication_date",
+            "common.priority",
+            "id",
+            "common.citated_docs",
+            "claims",
+            "claims_cleaned",
+            "abstract",
+            "abstract_cleaned",
+            "description",
+            "description_cleaned",
+        ]
+
+        for index in self.index:
+            try:
+                res = await self.es.get(
+                    id=id_date,
+                    index=index,
+                    _source_includes=_source_includes,
+                    request_timeout=timeout,
+                )
+                data = res["_source"]
+                for k in ("claims", "abstract", "description"):
+                    if (k + "_cleaned") in data.keys():
+                        del data[k]
+                return FIPSDocument(data)
+            except NotFoundError as ex:
+                continue
+            except TransportError as ex:
+                continue
+
+        return None
+
+    async def _search_query(
+        self,
+        number: str = "",
+        kind: str = "",
+        pub_office: str = "",
+        app_number: str = "",
+        size: int = 5,
+        timeout: int = 5,
+    ) -> list:
+
+        _source_includes = [
+            "common.document_number",
+            "common.kind",
+            "common.priority",
+            "common.publishing_office",
+            "common.publication_date",
             "id",
             "snippet",
-            # "common.citated_docs",
+            "common.application",
             # "claims",
             # "abstract",
             # "description",
@@ -202,18 +263,31 @@ class ESAPILoader(LoaderBase):
         query = {
             "query": {
                 "bool": {
-                    "should": [
-                        {
-                            "query_string": {
-                                "query": num_of_doc,
-                                "fields": ["id", "common.document_number"],
-                            }
-                        },
-                    ],
+                    "should": [],
                     "minimum_should_match": 1,
                 }
             }
         }
+
+        if app_number:
+            query["query"]["bool"]["should"].append(
+                {
+                    "query_string": {
+                        "query": app_number,
+                        "fields": ["common.application.number"],
+                    }
+                }
+            )
+
+        if number:
+            query["query"]["bool"]["should"].append(
+                {
+                    "query_string": {
+                        "query": number,
+                        "fields": ["id", "common.document_number"],
+                    }
+                }
+            )
 
         if pub_office:
             query["query"]["bool"]["should"].append(
@@ -239,47 +313,10 @@ class ESAPILoader(LoaderBase):
             index=self.index,
             body=query,
             _source_includes=_source_includes,
-            size=3,
+            size=size,
             request_timeout=timeout,
         )
 
         res = res["hits"]["hits"]
 
-        if res:
-            return await self.get_doc_by_id_date(res[0]["_id"], timeout)
-        else:
-            return None
-
-    async def get_doc_by_id_date(
-        self, id_date: str, timeout: int = 5
-    ) -> FIPSDocument | None:
-        _source_includes = [
-            "common.document_number",
-            "common.kind",
-            "common.publishing_office",
-            "common.publication_date",
-            "id",
-            "common.citated_docs",
-            "claims",
-            "claims_cleaned",
-            "abstract",
-            "abstract_cleaned",
-            "description",
-            "description_cleaned",
-        ]
-
-        for index in self.index:
-            try:
-                res = await self.es.get(
-                    id=id_date,
-                    index=index,
-                    _source_includes=_source_includes,
-                    request_timeout=timeout,
-                )
-                return FIPSDocument(res["_source"])
-            except NotFoundError as ex:
-                continue
-            except TransportError as ex:
-                continue
-
-        return None
+        return res

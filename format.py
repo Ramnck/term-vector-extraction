@@ -38,6 +38,8 @@ async def main(input_path: str, output_path: str | None, priority: bool = False)
 
         for method_name, relevant in all_relevant.items():
             # extractor_name, num = method_name.split("_")
+            if isinstance(relevant[0], list):
+                relevant = relevant[0]
             extractor_name = method_name
             path = dir_path / extractor_name
             os.makedirs(path, exist_ok=True)

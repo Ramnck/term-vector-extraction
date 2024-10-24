@@ -4,6 +4,7 @@ import logging
 import os
 from collections import Counter
 from datetime import datetime
+from operator import itemgetter
 from pathlib import Path
 
 import pandas as pd
@@ -17,12 +18,18 @@ from tve.utils import CircularTaskGroup, ForgivingTaskGroup, batched
 logger = logging.getLogger(__name__)
 
 
-async def process_document(api: LoaderBase, dataset_path: Path, doc_id: str):
-    doc = await api.get_doc(doc_id)
+async def process_document(loader: LoaderBase, dataset_path: Path, doc_id: str):
+    doc = await loader.get_doc(doc_id)
     if not doc:
         raise RuntimeError(f"{doc_id} from {dataset_path.name} not found")
     else:
         doc.save_file(dataset_path)
+
+
+async def preprocess_document(api: LoaderBase, priorities_dict: dict, doc_id: str):
+    us_doc = await api.get_doc(doc_id)
+    if not us_doc:
+        raise RuntimeError(f"{doc_id} not found")
 
 
 async def main(
@@ -42,26 +49,29 @@ async def main(
         d = i[1]
 
         doc_id = f'{d["PO"]}{d["PN"]}{d["KI"]}_{d["DP"].replace(".", "")}'
-        month = datetime.strptime(d["DP"], "%Y.%m.%d").month()
-        doc_ids.append((doc_id, month))
-        c[month] += 1
+        date = datetime.strptime(d["DP"], "%Y.%m.%d")
+        doc_ids.append((doc_id, date.month))
+        c[date.month] += 1
 
     doc_ids = doc_ids[:num_of_docs]
 
-    small_dataset = ([i for i in doc_ids if i[1] in [1, 2]], "150")
-    medium_dataset = ([i for i in doc_ids if i[1] in [8, 9, 11]], "300")
+    small_dataset = ([i for i in doc_ids if i[1] in [2, 4]], "150")
+    medium_dataset = ([i for i in doc_ids if i[1] in [10, 11, 12]], "300")
 
     logger.info(f"small dataset len: {len(small_dataset)}")
     logger.info(f"medium dataset len: {len(medium_dataset)}")
+    # import calendar
+    # for k, v in sorted(c.items(), key=itemgetter(0)):
+    #     print(f"{calendar.month_name[k]}:  {v}")
+    # print(f"{k}:  {v}")
 
-    for k, v in c.items():
-        logger.info(f"{k}: {v}")
-
-    return
+    # return
 
     def exception_handler(loop, ctx):
         ex = ctx["exception"]
         logger.error(f"{ex}")
+
+    priorities_dict = {}
 
     for dataset, name in (small_dataset, medium_dataset):
         progress_bar = tqdm(desc=f"Progress ({name})", total=len(dataset))
@@ -103,9 +113,6 @@ if __name__ == "__main__":
     api = ESAPILoader(ES_URL)
     data_path = Path("data") / "eval" / args.path
     loader = FSLoader(data_path, data_path, api)
-
-    if args.output is None:
-        args.output = args.input
 
     coro = main(
         loader,
