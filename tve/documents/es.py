@@ -206,6 +206,7 @@ class ESAPILoader(LoaderBase):
             "common.publishing_office",
             "common.publication_date",
             "common.priority",
+            "common.application",
             "id",
             "common.citated_docs",
             "claims",
