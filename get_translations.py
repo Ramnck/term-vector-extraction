@@ -11,7 +11,11 @@ from pathlib import Path
 
 import aiofiles
 import numpy as np
-from langchain_openai.chat_models import ChatOpenAI
+
+# from langchain_community.chat_models import GigaChat
+from langchain_community.llms.yandex import YandexGPT
+
+# from langchain_openai.chat_models import ChatOpenAI
 from tqdm import tqdm
 from tqdm.asyncio import tqdm_asyncio
 
@@ -27,10 +31,10 @@ from tve.pipeline import (
     get_relevant,
     test_different_vectors,
 )
+from tve.prompts import PromptTemplate, en_expand_prompt, ru_expand_prompt
 
 # from tve.translators.promt import PROMTTranslator
 from tve.translators.langchain import LangChainTranslator
-from tve.translators.prompts import PromptTemplate, en_expand_prompt, ru_expand_prompt
 from tve.utils import (
     CircularTaskGroup,
     ForgivingTaskGroup,
@@ -40,33 +44,28 @@ from tve.utils import (
     save_data_to_json,
 )
 
-# from langchain_community.chat_models import GigaChat
-# from langchain_community.llms.yandex import YandexGPT
-
 logging.getLogger("openai._base_client").setLevel(logging.WARN)
 logging.getLogger("httpx").setLevel(logging.WARN)
 
-chatgpt = ChatOpenAI(
-    model="gpt-4o-mini-2024-07-18",
-    temperature=0.5,
-    max_tokens=None,
-    timeout=None,
-)
+# chatgpt = ChatOpenAI(
+#     model="gpt-4o-mini-2024-07-18",
+#     temperature=0.5,
+#     max_tokens=None,
+#     timeout=None,
+# )
 
 # giga = GigaChat(
 #     streaming=True, scope="GIGACHAT_API_PERS", model="GigaChat", verify_ssl_certs=False
 # )
 
 # # yc iam create-token
-# yandex = YandexGPT(
-#     model_uri=f"gpt://{os.getenv('YANDEX_FOLDER_ID')}/yandexgpt-lite/latest"
-# )
+yandex = YandexGPT(model_uri=f"gpt://{os.getenv('YANDEX_FOLDER_ID')}/yandexgpt/rc")
 
 
 translators = [
-    LangChainTranslator(chatgpt, name="gpt-4o-mini", default_prompt=en_expand_prompt),
+    # LangChainTranslator(chatgpt, name="gpt-4o-mini", default_prompt=ru_expand_prompt),
     # LangChainTranslator(giga, "giga", default_prompt=ru_expand_prompt),
-    # LangChainTranslator(yandex, "yandex", "ru", default_prompt=ru_expand_prompt),
+    LangChainTranslator(yandex, "yandex", "ru", default_prompt=ru_expand_prompt),
     # LLMTranslator(),
     # PROMTTranslator(),
 ]
@@ -109,18 +108,24 @@ async def process_document(
                 for translator in translators:
                     for num in nums:
                         name = []
-                        # name.append(extractor_name)
+                        name.append(extractor_name)
                         name.append(translator.name)
                         # if len(nums) > 1:
                         #     name.append(str(num))
                         name = "_".join(name)
 
-                        if skip_done and name in new_keywords.keys():
+                        if (
+                            skip_done
+                            and hasattr(new_keywords.get(name, []), "__len__")
+                            and len(new_keywords.get(name, [])) > 3
+                        ):
                             continue
 
                         flat_kws = flatten_kws(kws)
                         tr = tg.create_task(
-                            translator.translate_list(flat_kws, num_of_suggestions=num)
+                            translator.translate_list(
+                                flat_kws, num_of_suggestions=num, noexcept=False
+                            )
                         )
                         # new_keywords[name] = [tr]
                         futures[name] = tr
@@ -137,11 +142,15 @@ async def process_document(
             if isinstance(text, list):
                 text = "".join(text)
             os.makedirs(dir_path / "errors", exist_ok=True)
-            with open(dir_path / "errors" / (data_dict["doc_id"] + ".txt"), "w") as f:
+            with open(
+                dir_path / "errors" / (data_dict["doc_id"] + ".txt"),
+                encoding="utf-8",
+                mode="w",
+            ) as f:
                 f.write(text)
-            new_keywords[name] = re.findall(r"(?:\")([\w ]+)(?:\"[:,\]])", text)
-        except:
-            pass
+            new_keywords[name] = re.findall(r"(?:\")([\w -]+)(?:\"[:,\]])", text)
+        except Exception as ex:
+            raise ex
 
     data_dict["keywords"] = new_keywords
 
@@ -190,7 +199,7 @@ async def main(
     # await executor.execute()
     def exception_handler(loop, ctx):
         ex = ctx["exception"]
-        logger.error(ex)
+        logger.error(f"Exception in exception_handler: {ex}")
 
     async with CircularTaskGroup(
         num_of_workers, lambda x: progress_bar.update(1), exception_handler
@@ -244,7 +253,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("-i", "--input", required=True)
     parser.add_argument("-o", "--output", default=None)
-    parser.add_argument("-n", "--number", default=500, type=int)
+    parser.add_argument("-n", "--number", default=None, type=int)
     parser.add_argument("-w", "--num-of-workers", default=5, type=int)
     parser.add_argument("--no-rewrite", action="store_true", default=False)
     parser.add_argument("--skip", "--skip-done", action="store_true", default=False)

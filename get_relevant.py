@@ -80,7 +80,16 @@ async def main(
         for doc_path in doc_paths:
             data = await load_data_from_json(doc_path)
 
-            kws = {k: flatten_kws(v) for k, v in data["keywords"].items()}
+            kws = {}
+
+            for k, v in data["keywords"].items():
+                if "YAKE" in k:
+                    if isinstance(v, dict):
+                        kws[k] = sum(v.values(), [])
+                    elif isinstance(v, list):
+                        kws[k] = v
+                else:
+                    kws[k] = flatten_kws(v, "слово/фраза")
 
             rel_coro = get_relevant(kws, api)
 

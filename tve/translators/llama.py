@@ -9,8 +9,8 @@ import aiohttp
 from llama_cpp import Llama
 
 from ..base import TranslatorBase
+from ..prompts import en_translate, ru_translate
 from ..utils import ForgivingTaskGroup
-from .prompts import en_translate, ru_translate
 
 logger = logging.getLogger(__name__)
 

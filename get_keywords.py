@@ -56,7 +56,7 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 extractors = [
-    YAKExtractor(max_ngram_size=2),
+    YAKExtractor(max_ngram_size=3),
     # KeyBERTExtractor(
     #     SentenceTransformer("intfloat/multilingual-e5-large"),
     #     "e5-large",
@@ -103,13 +103,13 @@ async def process_document(
     rewrite: bool = True,
 ):
 
-    cluster = await get_cluster_from_document(doc, loader, timeout=180, max_docs=40)
+    # cluster = await get_cluster_from_document(doc, loader, timeout=180, max_docs=40)
 
     path_of_file = (
         BASE_DATA_PATH / "eval" / name_of_experiment / (doc.id_date + ".json")
     )
 
-    old_data = await load_data_from_json(path_of_file)
+    old_data = await load_data_from_json(path_of_file) if rewrite else None
 
     if old_data is not None:
         data = old_data
@@ -136,9 +136,11 @@ async def process_document(
     ):
         return
 
-    new_keywords = await extract_keywords_from_docs(
-        cluster, extractors, performance=performance
-    )
+    # new_keywords = await extract_keywords_from_docs(
+    #     cluster, extractors, performance=performance
+    # )
+
+    new_keywords = {ex.name: ex.get_keywords(temp_doc, num=50) for ex in extractors}
 
     keywords.update(new_keywords)
 
@@ -148,8 +150,8 @@ async def process_document(
     #             continue
     #         keywords[ex.name] = ex.get_keywords(temp_doc, num=50)
 
-    if not keywords[random.choice(extractors).name][0][0]:
-        logger.error("Doc  %d has empty kws" % doc.id)
+    if len(keywords[random.choice(extractors).name]) == 0:
+        logger.error("Doc %s has empty kws" % doc.id_date)
         logger.error("  ".join(map(lambda x: x.id_date, [doc])))
 
     data["keywords"] = keywords

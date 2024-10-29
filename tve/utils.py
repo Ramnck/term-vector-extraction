@@ -26,7 +26,9 @@ class CircularTaskGroup:
         self,
         num_of_workers: int,
         default_callback: Callable | None = None,
-        exception_handler: Callable = lambda loop, ctx: None,
+        exception_handler: Callable = lambda loop, ctx: print(
+            "EXCEPTION", ctx["exception"]
+        ),
     ) -> None:
         self._default_callback = default_callback
         self._num_of_workers = num_of_workers
@@ -68,8 +70,9 @@ def batched(iterable, n=1):
 
 
 async def save_data_to_json(
-    obj: dict | list, path_of_file: Path
+    obj: dict | list, path_of_file: Path, noexcept: bool = False
 ) -> bool:  # False on success
+    """Return true if error occurs and noexcept==True"""
     try:
         async with aiofiles.open(
             path_of_file,
@@ -78,8 +81,11 @@ async def save_data_to_json(
         ) as file:
             await file.write(json.dumps(obj, ensure_ascii=False, indent=4))
         return False
-    except FileNotFoundError:
-        return True
+    except FileNotFoundError as ex:
+        if noexcept:
+            return True
+        else:
+            raise ex
 
 
 async def load_data_from_json(path_of_file: Path) -> dict | None:
@@ -95,7 +101,7 @@ async def load_data_from_json(path_of_file: Path) -> dict | None:
         return None
 
 
-def flatten_kws(input_data) -> list[str]:
+def flatten_kws(input_data, stopword: str = "") -> list[str]:
     def recursive_unwrap(data):
         if isinstance(data, dict):
             return list(data.keys()) + list(
@@ -106,4 +112,13 @@ def flatten_kws(input_data) -> list[str]:
         elif isinstance(data, list):
             return sum(map(recursive_unwrap, data), [])
 
-    return recursive_unwrap(input_data)
+    out = []
+
+    for i in recursive_unwrap(input_data):
+        i = i.strip()
+        if stopword:
+            if stopword in i:
+                continue
+        out.append(i)
+
+    return out
