@@ -141,8 +141,7 @@ async def get_relevant(
                     )
                 )
     except* Exception as exs:
-        for ex in exs.exceptions:
-            logger.error("Ex in get_relevant - %s" % str(ex))
+        pass
 
     relevant_results = {}
     for k, v in relevant.items():
