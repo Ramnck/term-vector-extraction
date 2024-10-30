@@ -6,7 +6,7 @@ import os
 import re
 import sys
 import time
-from itertools import product
+from itertools import compress, product
 from operator import itemgetter
 from pathlib import Path
 
@@ -87,11 +87,19 @@ async def main(
                     if isinstance(v, dict):
                         kw = sum(v.values(), [])
                     elif isinstance(v, list):
-                        kw = v
+                        # v_str = "|".join(v)
+                        kw = list(
+                            compress(
+                                v,
+                                map(
+                                    lambda x: len(re.findall(r"[а-яА-ЯёЁ]+", x)) == 0, v
+                                ),
+                            )
+                        )
                 else:
                     kw = flatten_kws(v, "слово/фраза")
 
-                kws[k] = kw[:225]
+                kws[k] = kw[:175]
 
             rel_coro = get_relevant(kws, api)
 
