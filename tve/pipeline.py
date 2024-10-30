@@ -34,7 +34,7 @@ logging.basicConfig(
     format=logging_format,
     datefmt="%H:%M:%S",
     filename=filepath,
-    filemode="w+",
+    filemode="a+",
     encoding="utf-8",
 )
 logger = logging.getLogger(__name__)
