@@ -141,8 +141,4 @@ if __name__ == "__main__":
 
     coro = main(api, args.number, args.input, args.output, args.num_of_workers)
     asyncio.run(coro)
-
-    try:
-        asyncio.run(api.close())
-    except:
-        pass
+    api.close()
