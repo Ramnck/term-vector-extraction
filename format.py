@@ -6,6 +6,7 @@ import os
 import re
 import sys
 import time
+from collections import Counter
 from itertools import product
 from pathlib import Path
 
@@ -28,6 +29,7 @@ def format_id(pat_id: str) -> str:
 
 
 async def main(input_path: str, output_path: str | None, priority: bool = False):
+    errors = Counter()
     input_dir_path = BASE_DATA_PATH / "eval" / input_path
     dir_path = BASE_DATA_PATH / "eval" / output_path
 
@@ -38,6 +40,9 @@ async def main(input_path: str, output_path: str | None, priority: bool = False)
 
         for method_name, relevant in all_relevant.items():
             # extractor_name, num = method_name.split("_")
+            if len(relevant) == 0:
+                errors[method_name + "_no_rel"] += 1
+                continue
             if isinstance(relevant[0], list):
                 relevant = relevant[0]
             extractor_name = method_name
@@ -56,6 +61,8 @@ async def main(input_path: str, output_path: str | None, priority: bool = False)
                     except Exception as ex:
                         logger.error(f"Error in main: {res}")
                         # raise ex
+
+    print("Errors:", errors)
 
 
 if __name__ == "__main__":

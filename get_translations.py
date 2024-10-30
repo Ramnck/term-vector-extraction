@@ -11,11 +11,7 @@ from pathlib import Path
 
 import aiofiles
 import numpy as np
-
-# from langchain_community.chat_models import GigaChat
-from langchain_community.llms.yandex import YandexGPT
-
-# from langchain_openai.chat_models import ChatOpenAI
+from langchain_openai.chat_models import ChatOpenAI
 from tqdm import tqdm
 from tqdm.asyncio import tqdm_asyncio
 
@@ -44,28 +40,32 @@ from tve.utils import (
     save_data_to_json,
 )
 
+# from langchain_community.chat_models import GigaChat
+# from langchain_community.llms.yandex import YandexGPT
+
+
 logging.getLogger("openai._base_client").setLevel(logging.WARN)
 logging.getLogger("httpx").setLevel(logging.WARN)
 
-# chatgpt = ChatOpenAI(
-#     model="gpt-4o-mini-2024-07-18",
-#     temperature=0.5,
-#     max_tokens=None,
-#     timeout=None,
-# )
+chatgpt = ChatOpenAI(
+    model="gpt-4o-mini-2024-07-18",
+    temperature=0.5,
+    max_tokens=None,
+    timeout=None,
+)
 
 # giga = GigaChat(
 #     streaming=True, scope="GIGACHAT_API_PERS", model="GigaChat", verify_ssl_certs=False
 # )
 
 # # yc iam create-token
-yandex = YandexGPT(model_uri=f"gpt://{os.getenv('YANDEX_FOLDER_ID')}/yandexgpt/rc")
+# yandex = YandexGPT(model_uri=f"gpt://{os.getenv('YANDEX_FOLDER_ID')}/yandexgpt/rc")
 
 
 translators = [
-    # LangChainTranslator(chatgpt, name="gpt-4o-mini", default_prompt=ru_expand_prompt),
+    LangChainTranslator(chatgpt, name="gpt-4o-mini", default_prompt=ru_expand_prompt),
     # LangChainTranslator(giga, "giga", default_prompt=ru_expand_prompt),
-    LangChainTranslator(yandex, "yandex", "ru", default_prompt=ru_expand_prompt),
+    # LangChainTranslator(yandex, "yandex", "ru", default_prompt=ru_expand_prompt),
     # LLMTranslator(),
     # PROMTTranslator(),
 ]
@@ -92,7 +92,7 @@ async def process_document(
 
     keywords = {}
     for k, v in raw_keywords.items():
-        if k in ["YAKE"]:
+        if k in ["YAKE", "PatS"]:
             if isinstance(v[0], list):
                 v = v[0]
             keywords[k] = v[:50]
@@ -160,7 +160,6 @@ async def process_document(
 
 
 async def main(
-    # api: LoaderBase,
     num_of_docs: int,
     input_path: str,
     output_path: str | None,
@@ -174,29 +173,9 @@ async def main(
 
     doc_paths = [i for i in dir_path.iterdir() if i.is_file()][:num_of_docs]
 
-    # methods = ["raw"]
-    # lens_of_vec = [125, 150, 175, 200]
-
     progress_bar = tqdm(desc="Progress", total=len(doc_paths))
     os.makedirs(BASE_DATA_PATH / "eval" / output_path, exist_ok=True)
 
-    # async def coroutine(doc_path):
-    #     data = await load_data_from_json(doc_path)
-
-    #     await process_document(
-    #         data,
-    #         BASE_DATA_PATH / "eval" / output_path,
-    #         skip_done=skip_done,
-    #         rewrite=rewrite,
-    #         sleep_time=sleep_time,
-    #         timeout=50,
-    #     )
-
-    # executor = CircularTaskExecutor(
-    #     map(coroutine, doc_paths), num_of_workers, lambda x: progress_bar.update(1)
-    # )
-
-    # await executor.execute()
     def exception_handler(loop, ctx):
         ex = ctx["exception"]
         logger.error(f"Exception in exception_handler: {ex}")
@@ -216,33 +195,6 @@ async def main(
                 )
             )
 
-    # for doc_path_batch in batched(doc_paths, n=num_of_workers):
-    #     # try:
-    #     async with ForgivingTaskGroup(progress_bar=progress_bar) as tg:
-
-    #         for doc_path in doc_path_batch:
-
-    #             data = await load_data_from_json(doc_path)
-
-    #             # rel_coro = test_different_vectors(
-    #             #     data["keywords"], methods, lens_of_vec, api, timeout=180
-    #             # )
-
-    #             tg.create_task(
-    #                 process_document(
-    #                     data,
-    #                     BASE_DATA_PATH / "eval" / output_path,
-    #                     skip_done=skip_done,
-    #                     rewrite=rewrite,
-    #                     sleep_time=sleep_time,
-    #                     timeout=50,
-    #                 )
-    #             )
-
-    # except* Exception as exs:
-    #     for ex in exs.exceptions:
-    #         logger.error("Exception in async for in main() - %s" % str(ex))
-
     progress_bar.close()
 
 
@@ -260,10 +212,6 @@ if __name__ == "__main__":
     parser.add_argument("--sleep", type=float, default=0.0)
 
     args = parser.parse_args()
-
-    # api = FipsAPI(FIPS_API_KEY)
-    # api = InternalESAPI(ES_URL)
-    # loader = FileSystem(Path("data") / "raw" / args.docs)
 
     if args.output is None:
         args.output = args.input + "_trans"

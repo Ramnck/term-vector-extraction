@@ -13,6 +13,7 @@ from elasticsearch7 import (
 )
 
 from ..base import LoaderBase
+from ..lexis import escape_elasticsearch_query
 from .fips import FIPSDocument
 
 logger = logging.getLogger(__name__)
@@ -43,7 +44,7 @@ class ESAPILoader(LoaderBase):
             "may22_ep",
             "may22_gb",
             "may22_ru_apps",
-            "may22f_ru_apps",
+            # "may22f_ru_apps",
         ]
         # self.languages = ["ja", "fr", "ru", "it", "de", "en", "ko", "es"]
         self.languages = ["ru", "en"]
@@ -140,7 +141,17 @@ class ESAPILoader(LoaderBase):
             "id",
         ]
 
-        kws = ["".join(re.findall(r"[a-zA-Zа-яА-ЯёЁ -]", i)).strip() for i in kws]
+        kws = [
+            "".join(re.findall(r"[%\*<>,\[\]\(\)\+/0-9a-zA-Zа-яА-ЯёЁ -]", i)).strip()
+            for i in kws
+        ]
+
+        kws = [
+            re.sub(r"\s+|-+", lambda x: " " if " " in x.group() else "-", i)
+            for i in kws
+        ]
+
+        kws = [escape_elasticsearch_query(i) for i in kws]
 
         kws = compress(kws, kws)
 

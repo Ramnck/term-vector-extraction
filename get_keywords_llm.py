@@ -153,15 +153,17 @@ async def main(
                 SystemMessage(model.system_prompt(50)),
                 HumanMessage(model.human_promt(doc.text)),
             ]
-
             try:
                 kws = await model.make_chat_completion(messages)
+                if "В интернете есть много сайтов" in kws:
+                    kws = ""
+                    logger.error(f"Wrong answer: {kws}")
                 kws = kws.split(",")
             except Exception as ex:
                 kws = []
                 logger.error(f"Exception in make_chat_completion {ex}")
 
-        kws = list(set((i.strip() for i in kws if i.strip())))
+        kws = list(dict.fromkeys((i.strip() for i in kws if i.strip())))
 
         data["keywords"][model.name] = kws
 
@@ -186,17 +188,17 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Get keywords using proprietary llm")
 
-    parser.add_argument("-m", "--model", default="y")
-    parser.add_argument("-p", "--prompt", default="ru_3")
-    parser.add_argument("-i", "--input", default="l")
-    parser.add_argument("-o", "--output", default="llm_ex")
-    parser.add_argument("--skip", "--skip-done", action="store_true", default=True)
+    # parser.add_argument("-m", "--model", default="y")
+    # parser.add_argument("-p", "--prompt", default="ru_3")
+    # parser.add_argument("-i", "--input", default="l")
+    # parser.add_argument("-o", "--output", default="llm_ex")
+    # parser.add_argument("--skip", "--skip-done", action="store_true", default=True)
 
-    # parser.add_argument("-m", "--model", required=True)
-    # parser.add_argument("-p", "--prompt", required=True)
-    # parser.add_argument("-i", "--input", required=True)
-    # parser.add_argument("-o", "--output", default=None)
-    # parser.add_argument("--skip", "--skip-done", action="store_true", default=False)
+    parser.add_argument("-m", "--model", required=True)
+    parser.add_argument("-p", "--prompt", required=True)
+    parser.add_argument("-i", "--input", required=True)
+    parser.add_argument("-o", "--output", default=None)
+    parser.add_argument("--skip", "--skip-done", action="store_true", default=False)
     parser.add_argument("-n", "--number", default=None, type=int)
     parser.add_argument("-w", "--num-of-workers", default=10, type=int)
     parser.add_argument("--no-rewrite", action="store_true", default=False)

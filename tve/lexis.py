@@ -44,6 +44,14 @@ def pos_tag_en(word: str, simplify: bool = False) -> str:
     return tag
 
 
+def escape_elasticsearch_query(query):
+    return re.sub(
+        '(\+|\=|&&|\|\||\>|\<|\!|\(|\)|\{|\}|\[|\]|\^|"|~|\*|\?|\:|\\\|\/)',
+        "\\\\\\1",
+        query,
+    )
+
+
 def extract_number(text: str, stripped: bool = True) -> str:
     m = re.findall(r"(\d{2,4}/)?(\d+)(?:/\d+)?", text)
     res = "".join(m[0]) if len(m) > 0 else ""
