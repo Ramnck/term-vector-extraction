@@ -108,6 +108,7 @@ async def main(
                     logger.error(
                         f"{input_path.stem} - {name} - WRONG TYPE({type(raw_kws)})"
                     )
+            kws = [k for k in kws if isinstance(k, str)]
             kws = kws[:175]
 
             if any(map(lambda x: len(x) == 1, kws)):
