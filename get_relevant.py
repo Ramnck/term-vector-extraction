@@ -40,16 +40,7 @@ from tve.utils import (
 
 logger = logging.getLogger(__name__)
 
-translator = PROMTTranslator(PROMT_IP, enable_cache=True)
-
-
-async def process_document(relevant_coroutine, data_dict, dir_path):
-    relevant = await relevant_coroutine
-    data_dict["relevant"] = relevant
-
-    file_path = dir_path / (data_dict["doc_id"] + ".json")
-    if await save_data_to_json(data_dict, file_path):
-        raise RuntimeError("Error saving file %s" % file_path)
+# translator = PROMTTranslator(PROMT_IP, enable_cache=True)
 
 
 async def main(
@@ -58,6 +49,9 @@ async def main(
     input_path: str,
     output_path: str | None,
     num_of_workers: int,
+    skip_done: bool = False,
+    rewrite: bool = True,
+    timeout: int = 90,
 ):
 
     dir_path = BASE_DATA_PATH / "eval" / input_path
@@ -72,51 +66,89 @@ async def main(
 
     def exception_handler(loop, ctx):
         ex = ctx["exception"]
-        logger.error(ex)
+        logger.error(f"error in main - {ex}")
 
-    async with CircularTaskGroup(
-        num_of_workers, lambda x: progress_bar.update(1), exception_handler
-    ) as tg:
-        for doc_path in doc_paths:
-            data = await load_data_from_json(doc_path)
+    async def process_document(input_path, output_path, tg: CircularTaskGroup):
 
-            kws = {}
+        old_data = await load_data_from_json(output_path) if rewrite else None
 
-            for k, v in data["keywords"].items():
-                if "YAKE" in k or "PatS" in k:
-                    if isinstance(v, dict):
-                        kw = sum(v.values(), [])
-                    elif isinstance(v, list):
-                        # v_str = "|".join(v)
-                        kw = list(
-                            compress(
-                                v,
-                                map(
-                                    lambda x: len(re.findall(r"[а-яА-ЯёЁ]+", x)) == 0, v
-                                ),
-                            )
+        relevant = old_data.get("relevant", {}) if old_data else {}
+
+        input_data = await load_data_from_json(input_path)
+        keywords = input_data.get("keywords", {})
+
+        futures = {}
+
+        for name, raw_kws in keywords.items():
+
+            if skip_done and name in relevant.keys():
+                continue
+
+            if "YAKE" in name or "PatS" in name:
+                if isinstance(raw_kws, dict):
+                    kws = sum(raw_kws.values(), [])
+                elif isinstance(raw_kws, list):
+                    kws = list(
+                        compress(
+                            raw_kws,
+                            map(
+                                lambda x: len(re.findall(r"[а-яА-ЯёЁ]+", x)) == 0,
+                                raw_kws,
+                            ),
                         )
-                else:
-                    kw = flatten_kws(v, "слово/фраза")
+                    )
+            else:
+                kws = flatten_kws(raw_kws, "слово/фраза")
 
-                kws[k] = kw[:175]
+            kws = kws[:175]
 
-            rel_coro = get_relevant(kws, api)
+            if any(map(lambda x: len(x) == 1, kws)):
+                logger.warning(
+                    f"ERROR - {input_path.stem} - kws have letter instead of word"
+                )
 
-            coro = process_document(
-                rel_coro, data, BASE_DATA_PATH / "eval" / output_path
+            futures[name] = await tg.create_task(
+                api.find_relevant_by_keywords(kws, num_of_docs=50, timeout=timeout)
             )
 
-            await tg.create_task(coro)
+        while all(map(lambda x: x.done(), futures.values())):
+            await asyncio.sleep(0.1)
+
+        for name, task in futures.items():
+            try:
+                relevant[name] = task.result()
+            except:
+                relevant[name] = []
+                pass
+
+        input_data["relevant"] = relevant
+
+        if await save_data_to_json(input_data, output_path):
+            raise RuntimeError("Error saving file %s" % output_path)
+
+    for doc_path_batch in batched(doc_paths, 15):
+        async with CircularTaskGroup(
+            num_of_workers, exception_handler=exception_handler
+        ) as task_pool:
+            async with ForgivingTaskGroup(progress_bar) as main_tg:
+
+                for doc_path in doc_path_batch:
+                    main_tg.create_task(
+                        process_document(
+                            doc_path,
+                            BASE_DATA_PATH / "eval" / output_path / doc_path.name,
+                            task_pool,
+                        )
+                    )
 
     progress_bar.close()
-    n_tr = sum(map(lambda x: len(x["tr"]), translator.cache.values()))
-    n_w = len(translator.cache)
-    if n_w > 0:
-        logger.info(
-            "В среднем %3.2f переводов на слово (всего %d слов)" % (n_tr / n_w, n_w)
-        )
-        await save_data_to_json(translator.cache, BASE_DATA_PATH / "cache.json")
+    # n_tr = sum(map(lambda x: len(x["tr"]), translator.cache.values()))
+    # n_w = len(translator.cache)
+    # if n_w > 0:
+    #     logger.info(
+    #         "В среднем %3.2f переводов на слово (всего %d слов)" % (n_tr / n_w, n_w)
+    #     )
+    #     await save_data_to_json(translator.cache, BASE_DATA_PATH / "cache.json")
 
 
 if __name__ == "__main__":
@@ -128,6 +160,9 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--output", default=None)
     parser.add_argument("-n", "--number", default=None, type=int)
     parser.add_argument("-w", "--num-of-workers", default=5, type=int)
+    parser.add_argument("--no-rewrite", action="store_true", default=False)
+    parser.add_argument("--skip", "--skip-done", action="store_true", default=False)
+    parser.add_argument("-t", "--timeout", default=90, type=int)
 
     args = parser.parse_args()
 
@@ -139,6 +174,15 @@ if __name__ == "__main__":
     if args.output is None:
         args.output = args.input + "_rel"
 
-    coro = main(api, args.number, args.input, args.output, args.num_of_workers)
+    coro = main(
+        api,
+        args.number,
+        args.input,
+        args.output,
+        args.num_of_workers,
+        skip_done=args.skip,
+        rewrite=not args.no_rewrite,
+        timeout=args.timeout,
+    )
     asyncio.run(coro)
     api.close()
