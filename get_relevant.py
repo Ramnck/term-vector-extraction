@@ -111,7 +111,7 @@ async def main(
                 api.find_relevant_by_keywords(kws, num_of_docs=50, timeout=timeout)
             )
 
-        while all(map(lambda x: x.done(), futures.values())):
+        while not all(map(lambda x: x.done(), futures.values())):
             await asyncio.sleep(0.1)
 
         for name, task in futures.items():
