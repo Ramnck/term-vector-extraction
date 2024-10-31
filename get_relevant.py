@@ -108,12 +108,12 @@ async def main(
                     logger.error(
                         f"{input_path.stem} - {name} - WRONG TYPE({type(raw_kws)})"
                     )
-            kws = [k for k in kws if isinstance(k, str)]
+            kws = [k for k in kws if isinstance(k, str) and len(k) > 2]
             kws = kws[:175]
 
             if any(map(lambda x: len(x) == 1, kws)):
                 logger.warning(
-                    f"ERROR - {input_path.stem} - kws have letter instead of word"
+                    f"{input_path.stem} - {name} - kws have letter instead of word"
                 )
 
             futures[name] = await tg.create_task(

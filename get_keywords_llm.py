@@ -146,7 +146,7 @@ async def main(
                 err_data[name] = text
                 await save_data_to_json(err_data, path)
 
-                kws = re.findall(r"(?:\")([\w -]+)(?:\"[:,\]])", text)
+                kws = re.findall(r"(?:\")([\w0-9 -]+)(?:\"[:,\]])", text)
 
         else:
             messages = [
