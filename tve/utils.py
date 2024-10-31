@@ -51,7 +51,8 @@ class CircularTaskGroup:
         return task
 
     async def __aexit__(self, exc_type, exc, tb):
-        await asyncio.wait(self._tasks)
+        if len(self._tasks) > 0:
+            await asyncio.wait(self._tasks)
         asyncio.get_event_loop().set_exception_handler(None)
 
 

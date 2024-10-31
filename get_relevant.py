@@ -97,9 +97,17 @@ async def main(
                             ),
                         )
                     )
+                else:
+                    logger.error(
+                        f"{input_path.stem} - {name} - WRONG TYPE({type(raw_kws)})"
+                    )
             else:
-                kws = flatten_kws(raw_kws, "слово/фраза")
-
+                if isinstance(raw_kws, (list, dict)):
+                    kws = flatten_kws(raw_kws, "слово/фраза")
+                else:
+                    logger.error(
+                        f"{input_path.stem} - {name} - WRONG TYPE({type(raw_kws)})"
+                    )
             kws = kws[:175]
 
             if any(map(lambda x: len(x) == 1, kws)):
