@@ -81,7 +81,7 @@ async def main(
 
         for name, raw_kws in keywords.items():
 
-            if skip_done and len(relevant.get(name, [])) < 3:
+            if skip_done and len(relevant.get(name, [])) > 3:
                 continue
 
             if "YAKE" in name or "PatS" in name:
