@@ -142,7 +142,7 @@ class ESAPILoader(LoaderBase):
         ]
 
         kws = [
-            "".join(re.findall(r"[%\*<>,\[\]\(\)\+/0-9a-zA-Zа-яА-ЯёЁ -]", i)).strip()
+            "".join(re.findall(r"[%\*<>,\[\]\+/0-9a-zA-Zа-яА-ЯёЁ -]", i)).strip()
             for i in kws
         ]
 

@@ -126,7 +126,8 @@ async def main(
         for name, task in futures.items():
             try:
                 relevant[name] = task.result()
-            except:
+            except Exception as ex:
+                logger.error(f"{input_path.stem} - {name} - error: {ex}")
                 relevant[name] = []
                 pass
 
