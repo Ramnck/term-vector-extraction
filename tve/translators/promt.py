@@ -42,38 +42,39 @@ class PROMTTranslator(TranslatorBase):
                 out = response.read().decode(response.headers.get_content_charset())
 
             out = out.replace('"', "").split("; ")
-            self.cache[word] = {"n": 1, "tr": out}
+            if self.cache is not None:
+                self.cache[word] = {"n": 1, "tr": out}
         else:
             self.cache[word]["n"] += 1
             out = self.cache[word]["tr"]
 
         return {"word": word, "translations": out}
 
-    async def _choose_words_en(
-        self, word: str, translations: list[str], num_words: int = 2
-    ) -> dict[str, list[str]]:
+    # async def _choose_words_en(
+    #     self, word: str, translations: list[str], num_words: int = 2
+    # ) -> dict[str, list[str]]:
 
-        data = []
+    #     data = []
 
-        w_tags = pos_tags_ru(word, simplify=True)
+    #     w_tags = pos_tags_ru(word, simplify=True)
 
-        global_pos_priority = ["NOUN", "VERB", "ADJ", "ADV"]
-        pos_priority = list(dict.fromkeys(w_tags + global_pos_priority))
+    #     global_pos_priority = ["NOUN", "VERB", "ADJ", "ADV"]
+    #     pos_priority = list(dict.fromkeys(w_tags + global_pos_priority))
 
-        pos_word_dict = {}
+    #     pos_word_dict = {}
 
-        for tr in translations:
-            try:
-                pos_word_dict[pos_tags_ru(tr)].append(tr)
-            except:
-                pos_word_dict[pos_tag_en(tr)] = [tr]
+    #     for tr in translations:
+    #         try:
+    #             pos_word_dict[pos_tags_ru(tr)].append(tr)
+    #         except:
+    #             pos_word_dict[pos_tag_en(tr)] = [tr]
 
-        tmp = {k: v.copy() for k, v in pos_word_dict.items()}
-        for pos in pos_priority:
-            while len(data) < num_words and len(tmp.get(pos, [])) > 0:
-                data.append(tmp[pos].pop(0))
+    #     tmp = {k: v.copy() for k, v in pos_word_dict.items()}
+    #     for pos in pos_priority:
+    #         while len(data) < num_words and len(tmp.get(pos, [])) > 0:
+    #             data.append(tmp[pos].pop(0))
 
-        return data
+    #     return data
 
     async def translate_list(
         self,

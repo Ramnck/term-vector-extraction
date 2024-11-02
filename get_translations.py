@@ -23,6 +23,7 @@ from tve.pipeline import (
     BASE_DATA_PATH,
     ES_URL,
     FIPS_API_KEY,
+    PROMT_IP,
     extract_keywords_from_docs,
     get_cluster_from_document,
     get_relevant,
@@ -67,7 +68,7 @@ translators = [
     # LangChainTranslator(giga, "giga", default_prompt=ru_expand_prompt),
     # LangChainTranslator(yandex, "yandex", "ru", default_prompt=ru_expand_prompt),
     # LLMTranslator(),
-    PROMTTranslator(),
+    PROMTTranslator(PROMT_IP),
 ]
 
 logger = logging.getLogger(__name__)
