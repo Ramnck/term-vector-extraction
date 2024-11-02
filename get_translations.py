@@ -11,7 +11,8 @@ from pathlib import Path
 
 import aiofiles
 import numpy as np
-from langchain_openai.chat_models import ChatOpenAI
+
+# from langchain_openai.chat_models import ChatOpenAI
 from tqdm import tqdm
 from tqdm.asyncio import tqdm_asyncio
 
@@ -28,9 +29,8 @@ from tve.pipeline import (
     test_different_vectors,
 )
 from tve.prompts import PromptTemplate, en_expand_prompt, ru_expand_prompt
-
-# from tve.translators.promt import PROMTTranslator
 from tve.translators.langchain import LangChainTranslator
+from tve.translators.promt import PROMTTranslator
 from tve.utils import (
     CircularTaskGroup,
     ForgivingTaskGroup,
@@ -47,12 +47,12 @@ from tve.utils import (
 logging.getLogger("openai._base_client").setLevel(logging.WARN)
 logging.getLogger("httpx").setLevel(logging.WARN)
 
-chatgpt = ChatOpenAI(
-    model="gpt-4o-mini-2024-07-18",
-    temperature=0.5,
-    max_tokens=None,
-    timeout=None,
-)
+# chatgpt = ChatOpenAI(
+#     model="gpt-4o-mini-2024-07-18",
+#     temperature=0.5,
+#     max_tokens=None,
+#     timeout=None,
+# )
 
 # giga = GigaChat(
 #     streaming=True, scope="GIGACHAT_API_PERS", model="GigaChat", verify_ssl_certs=False
@@ -63,11 +63,11 @@ chatgpt = ChatOpenAI(
 
 
 translators = [
-    LangChainTranslator(chatgpt, name="gpt-4o-mini", default_prompt=ru_expand_prompt),
+    # LangChainTranslator(chatgpt, name="gpt-4o-mini", default_prompt=ru_expand_prompt),
     # LangChainTranslator(giga, "giga", default_prompt=ru_expand_prompt),
     # LangChainTranslator(yandex, "yandex", "ru", default_prompt=ru_expand_prompt),
     # LLMTranslator(),
-    # PROMTTranslator(),
+    PROMTTranslator(),
 ]
 
 logger = logging.getLogger(__name__)

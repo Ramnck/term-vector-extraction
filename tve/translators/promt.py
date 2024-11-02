@@ -110,17 +110,12 @@ class PROMTTranslator(TranslatorBase):
                     "Exception in PROMTTranslator future.result - %s" % str(type(ex))
                 )
 
-        data_dict_list = [
-            await self._choose_words_en(
-                d["word"], d["translations"], num_words=num_of_suggestions
-            )
-            for d in out
-        ]
+        data_dict = {d["word"]: d["translations"] for d in out}
 
-        data_output = {
-            "same_pos": sum(map(itemgetter("same_pos"), data_dict_list), start=[]),
-            "diff_pos": sum(map(itemgetter("diff_pos"), data_dict_list), start=[]),
-        }
+        # data_output = {
+        #     "same_pos": sum(map(itemgetter("same_pos"), data_dict_list), start=[]),
+        #     "diff_pos": sum(map(itemgetter("diff_pos"), data_dict_list), start=[]),
+        # }
 
         # for data_dict in out:
         #     words = await self._choose_words_en(
@@ -128,4 +123,4 @@ class PROMTTranslator(TranslatorBase):
         #     )
         #     extension += words
 
-        return data_output
+        return data_dict
