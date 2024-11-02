@@ -74,7 +74,12 @@ async def main(
 
         relevant = old_data.get("relevant", {}) if old_data else {}
 
-        input_data = await load_data_from_json(input_path)
+        try:
+            input_data = await load_data_from_json(input_path)
+        except json.JSONDecodeError:
+            logger.error(f"{input_path.parent / input_path.name} have broken structure")
+            return
+
         keywords = input_data.get("keywords", {})
 
         futures = {}
