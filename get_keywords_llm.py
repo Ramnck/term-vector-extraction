@@ -156,8 +156,8 @@ async def main(
             try:
                 kws = await model.make_chat_completion(messages)
                 if "В интернете есть много сайтов" in kws:
-                    kws = ""
                     logger.error(f"Wrong answer: {kws}")
+                    kws = ""
                 kws = kws.split(",")
             except Exception as ex:
                 kws = []

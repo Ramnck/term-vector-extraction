@@ -146,6 +146,8 @@ class ESAPILoader(LoaderBase):
             for i in kws
         ]
 
+        kws = [re.sub(r"OR|AND|NOT", "", i) for i in kws]
+
         kws = [
             re.sub(r"\s+|-+", lambda x: " " if " " in x.group() else "-", i)
             for i in kws

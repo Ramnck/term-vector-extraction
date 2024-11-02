@@ -58,7 +58,7 @@ chatgpt = ChatOpenAI(
 #     streaming=True, scope="GIGACHAT_API_PERS", model="GigaChat", verify_ssl_certs=False
 # )
 
-# # yc iam create-token
+# yc iam create-token
 # yandex = YandexGPT(model_uri=f"gpt://{os.getenv('YANDEX_FOLDER_ID')}/yandexgpt/rc")
 
 
@@ -92,10 +92,10 @@ async def process_document(
 
     keywords = {}
     for k, v in raw_keywords.items():
-        if k in ["YAKE", "PatS"]:
-            if isinstance(v[0], list):
-                v = v[0]
-            keywords[k] = v[:50]
+        # if k in ["YAKE", "PatS"]:
+        if isinstance(v[0], list):
+            v = v[0]
+        keywords[k] = v[:50]
 
     old_data = (await load_data_from_json(outfile_path)) if rewrite else None
 
