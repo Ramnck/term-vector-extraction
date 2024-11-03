@@ -90,8 +90,13 @@ async def main(
                 continue
 
             if "YAKE" in name or "PatS" in name:
+
+                #####################################
+                return
+                #####################################
                 if isinstance(raw_kws, dict):
                     kws = sum(raw_kws.values(), [])
+
                 elif isinstance(raw_kws, list):
                     kws = list(
                         compress(
@@ -107,14 +112,17 @@ async def main(
                         f"{input_path.stem} - {name} - WRONG TYPE({type(raw_kws)})"
                     )
             else:
-                if isinstance(raw_kws, (list, dict)):
-                    kws = flatten_kws(raw_kws, "слово/фраза")
+                if isinstance(raw_kws, dict):
+                    # kws = flatten_kws(raw_kws, "слово/фраза")
+                    kws = sum(raw_kws.values(), [])
+                elif isinstance(raw_kws, list):
+                    kws = raw_kws
                 else:
                     logger.error(
                         f"{input_path.stem} - {name} - WRONG TYPE({type(raw_kws)})"
                     )
             kws = [k for k in kws if isinstance(k, str) and len(k) > 2]
-            kws = kws[:175]
+            kws = kws[:200]
 
             if any(map(lambda x: len(x) == 1, kws)):
                 logger.warning(

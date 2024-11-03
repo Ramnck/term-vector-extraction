@@ -142,20 +142,21 @@ class ESAPILoader(LoaderBase):
         ]
 
         kws = [
-            "".join(re.findall(r"[%\*<>,\[\]\+/0-9a-zA-Zа-яА-ЯёЁ -]", i)).strip()
-            for i in kws
+            "".join(re.findall(r"[%\*<>,\[\]\+/0-9a-zA-Zа-яА-ЯёЁ -]", i)) for i in kws
         ]
 
-        kws = [re.sub(r"OR|AND|NOT", "", i) for i in kws]
+        kws = [re.sub(r"or|and|not", "", i.lower()) for i in kws]
 
         kws = [
-            re.sub(r"\s+|-+", lambda x: " " if " " in x.group() else "-", i)
+            re.sub(r"\s+|-+", lambda x: " " if " " in x.group() else "-", i).strip()
             for i in kws
         ]
 
-        kws = [escape_elasticsearch_query(i) for i in kws]
-
         kws = compress(kws, kws)
+
+        kws = dict.fromkeys(kws)
+
+        kws = [escape_elasticsearch_query(i) for i in kws]
 
         query_string = " OR ".join(map(lambda x: f"({x})", kws))
 
