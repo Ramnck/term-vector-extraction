@@ -59,9 +59,6 @@ async def main(
     doc_paths = [i for i in dir_path.iterdir() if i.is_file()][:num_of_docs]
     os.makedirs(BASE_DATA_PATH / "eval" / output_path, exist_ok=True)
 
-    methods = ["raw"]
-    lens_of_vec = [125, 150, 175, 200]
-
     progress_bar = tqdm(desc="Progress", total=len(doc_paths))
 
     def exception_handler(loop, ctx):
@@ -142,6 +139,8 @@ async def main(
                         )
                     )
 
+    await api.es.close()
+
     progress_bar.close()
     # n_tr = sum(map(lambda x: len(x["tr"]), translator.cache.values()))
     # n_w = len(translator.cache)
@@ -186,4 +185,4 @@ if __name__ == "__main__":
         timeout=args.timeout,
     )
     asyncio.run(coro)
-    api.close()
+    # api.close()

@@ -12,6 +12,9 @@ from pathlib import Path
 import aiofiles
 import numpy as np
 
+# from langchain_community.chat_models import GigaChat
+from langchain_community.llms.yandex import YandexGPT
+
 # from langchain_openai.chat_models import ChatOpenAI
 from tqdm import tqdm
 from tqdm.asyncio import tqdm_asyncio
@@ -31,7 +34,8 @@ from tve.pipeline import (
 )
 from tve.prompts import PromptTemplate, en_expand_prompt, ru_expand_prompt
 from tve.translators.langchain import LangChainTranslator
-from tve.translators.promt import PROMTTranslator
+
+# from tve.translators.promt import PROMTTranslator
 from tve.utils import (
     CircularTaskGroup,
     ForgivingTaskGroup,
@@ -40,10 +44,6 @@ from tve.utils import (
     load_data_from_json,
     save_data_to_json,
 )
-
-# from langchain_community.chat_models import GigaChat
-# from langchain_community.llms.yandex import YandexGPT
-
 
 logging.getLogger("openai._base_client").setLevel(logging.WARN)
 logging.getLogger("httpx").setLevel(logging.WARN)
@@ -60,15 +60,15 @@ logging.getLogger("httpx").setLevel(logging.WARN)
 # )
 
 # yc iam create-token
-# yandex = YandexGPT(model_uri=f"gpt://{os.getenv('YANDEX_FOLDER_ID')}/yandexgpt/rc")
+yandex = YandexGPT(model_uri=f"gpt://{os.getenv('YANDEX_FOLDER_ID')}/yandexgpt/rc")
 
 
 translators = [
     # LangChainTranslator(chatgpt, name="gpt-4o-mini", default_prompt=ru_expand_prompt),
     # LangChainTranslator(giga, "giga", default_prompt=ru_expand_prompt),
-    # LangChainTranslator(yandex, "yandex", "ru", default_prompt=ru_expand_prompt),
+    LangChainTranslator(yandex, "yandex", "ru", default_prompt=ru_expand_prompt),
     # LLMTranslator(),
-    PROMTTranslator(PROMT_IP),
+    # PROMTTranslator(PROMT_IP),
 ]
 
 logger = logging.getLogger(__name__)
@@ -139,7 +139,7 @@ async def process_document(
             if future.result() is not None:
                 new_keywords[name] = future.result()
         except RuntimeError as ex:
-            name, text = str(ex).split(";")
+            _, text = str(ex).split(";")
             if isinstance(text, list):
                 text = "".join(text)
             os.makedirs(dir_path / "errors", exist_ok=True)
@@ -148,8 +148,10 @@ async def process_document(
                 encoding="utf-8",
                 mode="w",
             ) as f:
-                f.write(text)
-            new_keywords[name] = re.findall(r"(?:\")([\w -]+)(?:\"[:,\]])", text)
+                f.write(f'"{name}": ' + text)
+            all_kws = re.findall(r"(?:\")([\w -]+)(?:\"[:,\]])", text)
+            en_kws = [i for i in all_kws if len(re.findall(r"[А-Яа-яЁё]", i)) == 0]
+            new_keywords[name] = en_kws
         except Exception as ex:
             raise ex
 
