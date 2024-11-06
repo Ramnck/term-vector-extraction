@@ -11,11 +11,6 @@ from pathlib import Path
 
 import aiofiles
 import numpy as np
-
-# from langchain_community.chat_models import GigaChat
-from langchain_community.llms.yandex import YandexGPT
-
-# from langchain_openai.chat_models import ChatOpenAI
 from tqdm import tqdm
 from tqdm.asyncio import tqdm_asyncio
 
@@ -33,9 +28,7 @@ from tve.pipeline import (
     test_different_vectors,
 )
 from tve.prompts import PromptTemplate, en_expand_prompt, ru_expand_prompt
-from tve.translators.langchain import LangChainTranslator
-
-# from tve.translators.promt import PROMTTranslator
+from tve.translators.promt import PROMTTranslator
 from tve.utils import (
     CircularTaskGroup,
     ForgivingTaskGroup,
@@ -44,6 +37,14 @@ from tve.utils import (
     load_data_from_json,
     save_data_to_json,
 )
+
+# from langchain_community.chat_models import GigaChat
+# from langchain_community.llms.yandex import YandexGPT
+# from langchain_openai.chat_models import ChatOpenAI
+
+
+# from tve.translators.langchain import LangChainTranslator
+
 
 logging.getLogger("openai._base_client").setLevel(logging.WARN)
 logging.getLogger("httpx").setLevel(logging.WARN)
@@ -60,15 +61,15 @@ logging.getLogger("httpx").setLevel(logging.WARN)
 # )
 
 # yc iam create-token
-yandex = YandexGPT(model_uri=f"gpt://{os.getenv('YANDEX_FOLDER_ID')}/yandexgpt/rc")
+# yandex = YandexGPT(model_uri=f"gpt://{os.getenv('YANDEX_FOLDER_ID')}/yandexgpt/rc")
 
 
 translators = [
     # LangChainTranslator(chatgpt, name="gpt-4o-mini", default_prompt=ru_expand_prompt),
     # LangChainTranslator(giga, "giga", default_prompt=ru_expand_prompt),
-    LangChainTranslator(yandex, "yandex", "ru", default_prompt=ru_expand_prompt),
+    # LangChainTranslator(yandex, "yandex", "ru", default_prompt=ru_expand_prompt),
     # LLMTranslator(),
-    # PROMTTranslator(PROMT_IP),
+    PROMTTranslator(PROMT_IP),
 ]
 
 logger = logging.getLogger(__name__)

@@ -148,7 +148,9 @@ class ESAPILoader(LoaderBase):
         kws = [re.sub(r"or|and|not", "", i.lower()) for i in kws]
 
         kws = [
-            re.sub(r"\s+|-+", lambda x: " " if " " in x.group() else "-", i).strip()
+            re.sub(r"\s+|-+", lambda x: " " if " " in x.group() else "-", i).strip(
+                " -\n\r"
+            )
             for i in kws
         ]
 
