@@ -154,7 +154,8 @@ async def process_document(
             en_kws = [i for i in all_kws if len(re.findall(r"[А-Яа-яЁё]", i)) == 0]
             new_keywords[name] = en_kws
         except Exception as ex:
-            raise ex
+            logger.error(f"Exception in process_document.future.result - {ex}")
+            # raise ex
 
     data_dict["keywords"] = new_keywords
 

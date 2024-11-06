@@ -82,6 +82,7 @@ class PROMTTranslator(TranslatorBase):
         from_lang: str = "ru",
         to_lang: str = "en",
         num_of_suggestions: int = 2,
+        noexcept: bool = True,
         **kwargs,
     ) -> list[str]:
 
@@ -95,10 +96,11 @@ class PROMTTranslator(TranslatorBase):
                         tg.create_task(self._translate_word(word, from_lang, to_lang))
                     )
         except* Exception as exs:
-            for ex in exs.exceptions:
-                logger.error(
-                    "Exception in PROMTTranslator.translate - %s" % str(type(ex))
-                )
+            pass
+            # for ex in exs.exceptions:
+            #     logger.error(
+            #         "Exception in PROMTTranslator.translate - %s" % str(type(ex))
+            #     )
 
         out = []
 
@@ -107,9 +109,13 @@ class PROMTTranslator(TranslatorBase):
                 if future.result() is not None:
                     out.append(future.result())
             except Exception as ex:
-                logger.error(
-                    "Exception in PROMTTranslator future.result - %s" % str(type(ex))
-                )
+
+                if noexcept:
+                    logger.error(
+                        "Exception in PROMTTranslator.translate - %s" % str(type(ex))
+                    )
+                else:
+                    raise ex
 
         data_dict = {d["word"]: d["translations"] for d in out}
 
