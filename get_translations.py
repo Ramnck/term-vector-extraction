@@ -132,8 +132,9 @@ async def process_document(
                         # new_keywords[name] = [tr]
                         futures[name] = tr
     except* Exception as exs:
-        for ex in exs.exceptions:
-            logger.error(f"Exception in process document - {ex}")
+        pass
+        # for ex in exs.exceptions:
+        #     logger.error(f"Exception in process document - {ex}")
 
     for name, future in futures.items():
         try:
@@ -154,7 +155,9 @@ async def process_document(
             en_kws = [i for i in all_kws if len(re.findall(r"[А-Яа-яЁё]", i)) == 0]
             new_keywords[name] = en_kws
         except Exception as ex:
-            logger.error(f"Exception in process_document.future.result - {ex}")
+            logger.error(
+                f"Exception in process_document.future.result ({data_dict['doc_id']}  {name}) - {ex}"
+            )
             # raise ex
 
     data_dict["keywords"] = new_keywords
