@@ -80,7 +80,7 @@ async def main(
             yandex, "yandex", default_prompt=prompt, return_json=return_json
         )
         num_of_workers = min(num_of_workers, 10)
-    elif model == "s":
+    elif model == "g":
         from langchain_community.chat_models import GigaChat
 
         giga = GigaChat(
@@ -93,7 +93,7 @@ async def main(
             giga, "giga", default_prompt=prompt, return_json=return_json
         )
         num_of_workers = 1
-    elif model == "o":
+    elif model == "c":
         from langchain_openai.chat_models import ChatOpenAI
 
         chatgpt = ChatOpenAI(
@@ -156,12 +156,13 @@ async def main(
             try:
                 kws = await model.make_chat_completion(messages)
                 if "В интернете есть много сайтов" in kws:
-                    logger.error(f"Wrong answer: {kws}")
-                    kws = ""
+                    raise RuntimeError(kws)
                 kws = kws.split(",")
             except Exception as ex:
                 kws = []
-                logger.error(f"Exception in make_chat_completion {ex}")
+                logger.error(
+                    f"Exception in make_chat_completion - {doc_id} - {model.name} - {ex}"
+                )
 
         kws = list(dict.fromkeys((i.strip() for i in kws if i.strip())))
 

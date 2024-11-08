@@ -72,7 +72,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("-i", "--input", required=True)
     parser.add_argument("-o", "--output", required=True)
-    parser.add_argument("--priority", action="store_true", default=False)
+    parser.add_argument("-p", "--priority", action="store_true", default=False)
 
     args = parser.parse_args()
 

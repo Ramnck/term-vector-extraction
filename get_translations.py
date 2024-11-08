@@ -15,8 +15,6 @@ from tqdm import tqdm
 from tqdm.asyncio import tqdm_asyncio
 
 from tve.base import LoaderBase
-
-# from tve.documents import FSLoader, FIPSAPILoader, ESAPILoader
 from tve.pipeline import (
     BASE_DATA_PATH,
     ES_URL,
@@ -28,7 +26,6 @@ from tve.pipeline import (
     test_different_vectors,
 )
 from tve.prompts import PromptTemplate, en_expand_prompt, ru_expand_prompt
-from tve.translators.promt import PROMTTranslator
 from tve.utils import (
     CircularTaskGroup,
     ForgivingTaskGroup,
@@ -38,39 +35,11 @@ from tve.utils import (
     save_data_to_json,
 )
 
-# from langchain_community.chat_models import GigaChat
-# from langchain_community.llms.yandex import YandexGPT
-# from langchain_openai.chat_models import ChatOpenAI
-
-
-# from tve.translators.langchain import LangChainTranslator
-
-
 logging.getLogger("openai._base_client").setLevel(logging.WARN)
 logging.getLogger("httpx").setLevel(logging.WARN)
 
-# chatgpt = ChatOpenAI(
-#     model="gpt-4o-mini-2024-07-18",
-#     temperature=0.5,
-#     max_tokens=None,
-#     timeout=None,
-# )
 
-# giga = GigaChat(
-#     streaming=True, scope="GIGACHAT_API_PERS", model="GigaChat", verify_ssl_certs=False
-# )
-
-# yc iam create-token
-# yandex = YandexGPT(model_uri=f"gpt://{os.getenv('YANDEX_FOLDER_ID')}/yandexgpt/rc")
-
-
-translators = [
-    # LangChainTranslator(chatgpt, name="gpt-4o-mini", default_prompt=ru_expand_prompt),
-    # LangChainTranslator(giga, "giga", default_prompt=ru_expand_prompt),
-    # LangChainTranslator(yandex, "yandex", "ru", default_prompt=ru_expand_prompt),
-    # LLMTranslator(),
-    PROMTTranslator(PROMT_IP),
-]
+translators = []
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +64,9 @@ async def process_document(
     keywords = {}
     for k, v in raw_keywords.items():
         # if k in ["YAKE", "PatS"]:
+        if len(v) == 0:
+            logger.warning(f"No keywords for {k} in {data_dict['doc_id']}")
+            continue
         if isinstance(v[0], list):
             v = v[0]
         keywords[k] = v[:50]
@@ -172,10 +144,68 @@ async def main(
     input_path: str,
     output_path: str | None,
     num_of_workers: int,
+    models: str = "",
     skip_done: bool = False,
     rewrite: bool = True,
     sleep_time: float = 0.0,
 ):
+    for model in models:
+        if model == "y":
+            from langchain_community.llms.yandex import YandexGPT
+
+            from tve.translators.langchain import LangChainTranslator
+
+            yandex = YandexGPT(
+                model_uri=f"gpt://{os.getenv('YANDEX_FOLDER_ID')}/yandexgpt/rc"
+            )
+            model = LangChainTranslator(
+                yandex,
+                "yandex",
+                default_prompt=ru_expand_prompt,
+            )
+            num_of_workers = min(num_of_workers, 10)
+        elif model == "g":
+            from langchain_community.chat_models import GigaChat
+
+            from tve.translators.langchain import LangChainTranslator
+
+            giga = GigaChat(
+                streaming=True,
+                scope="GIGACHAT_API_PERS",
+                model="GigaChat",
+                verify_ssl_certs=False,
+            )
+            model = LangChainTranslator(
+                giga,
+                "giga",
+                default_prompt=ru_expand_prompt,
+            )
+            num_of_workers = 1
+        elif model == "c":
+            from langchain_openai.chat_models import ChatOpenAI
+
+            from tve.translators.langchain import LangChainTranslator
+
+            chatgpt = ChatOpenAI(
+                model="gpt-4o-mini-2024-07-18",
+                temperature=0.5,
+                max_tokens=None,
+                timeout=None,
+            )
+            model = LangChainTranslator(
+                chatgpt,
+                name="gpt-4o-mini",
+                default_prompt=en_expand_prompt,
+            )
+        elif model == "p":
+            from tve.translators.promt import PROMTTranslator
+
+            model = PROMTTranslator(PROMT_IP)
+
+        else:
+            logger.error("Error - model not supported")
+            exit(1)
+        translators.append(model)
 
     dir_path = BASE_DATA_PATH / "eval" / input_path
 
@@ -218,6 +248,7 @@ if __name__ == "__main__":
     parser.add_argument("--no-rewrite", action="store_true", default=False)
     parser.add_argument("--skip", "--skip-done", action="store_true", default=False)
     parser.add_argument("--sleep", type=float, default=0.0)
+    parser.add_argument("-m", "--models", required=True)
 
     args = parser.parse_args()
 
@@ -232,5 +263,6 @@ if __name__ == "__main__":
         skip_done=args.skip,
         rewrite=not args.no_rewrite,
         sleep_time=args.sleep,
+        models=args.models,
     )
     asyncio.run(coro)

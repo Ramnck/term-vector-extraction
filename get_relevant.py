@@ -63,7 +63,7 @@ async def main(
 
     def exception_handler(loop, ctx):
         ex = ctx["exception"]
-        logger.error(f"error in main - {ex}")
+        logger.error(f"exception_handler in main - {ex}")
 
     async def process_document(input_path, output_path, tg: CircularTaskGroup):
 
@@ -124,7 +124,7 @@ async def main(
         if await save_data_to_json(input_data, output_path):
             raise RuntimeError("Error saving file %s" % output_path)
 
-    for doc_path_batch in batched(doc_paths, 15):
+    for doc_path_batch in batched(doc_paths, num_of_workers):
         async with CircularTaskGroup(
             num_of_workers, exception_handler=exception_handler
         ) as task_pool:
