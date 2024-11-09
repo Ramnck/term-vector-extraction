@@ -98,6 +98,9 @@ async def main(
 
             kws = [k for k in kws if isinstance(k, str) and len(k) > 2]
             kws = kws[:200]
+            if len(kws) == 0:
+                logger.warning(f"{input_path.stem} - {name} - kws is empty")
+                continue
 
             if any(map(lambda x: len(x) == 1, kws)):
                 logger.warning(

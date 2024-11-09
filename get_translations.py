@@ -222,6 +222,8 @@ async def main(
         num_of_workers, lambda x: progress_bar.update(1), exception_handler
     ) as tg:
         for doc_path in doc_paths:
+            if doc_path.stem != "RU2003125526A_20050210":
+                continue
             data = await load_data_from_json(doc_path)
             await tg.create_task(
                 process_document(
