@@ -52,6 +52,8 @@ async def main(
     skip_done: bool = False,
     rewrite: bool = True,
     timeout: int = 90,
+    with_scores: bool = False,
+    wo_kws: bool = False,
 ):
 
     dir_path = BASE_DATA_PATH / "eval" / input_path
@@ -112,7 +114,9 @@ async def main(
                 )
 
             futures[name] = await tg.create_task(
-                api.find_relevant_by_keywords(kws, num_of_docs=50, timeout=timeout)
+                api.find_relevant_by_keywords(
+                    kws, num_of_docs=50, timeout=timeout, with_scores=with_scores
+                )
             )
 
         while not all(map(lambda x: x.done(), futures.values())):
@@ -127,6 +131,9 @@ async def main(
                 pass
 
         input_data["relevant"] = relevant
+
+        if wo_kws:
+            del input_data["keywords"]
 
         if await save_data_to_json(input_data, output_path):
             raise RuntimeError("Error saving file %s" % output_path)
@@ -170,6 +177,8 @@ if __name__ == "__main__":
     parser.add_argument("--no-rewrite", action="store_true", default=False)
     parser.add_argument("--skip", "--skip-done", action="store_true", default=False)
     parser.add_argument("-t", "--timeout", default=90, type=int)
+    parser.add_argument("--wo-kws", action="store_true", default=False)
+    parser.add_argument("--scores", action="store_true", default=False)
 
     args = parser.parse_args()
 
@@ -190,6 +199,8 @@ if __name__ == "__main__":
         skip_done=args.skip,
         rewrite=not args.no_rewrite,
         timeout=args.timeout,
+        with_scores=args.scores,
+        wo_kws=args.wo_kws,
     )
     asyncio.run(coro)
     # api.close()
