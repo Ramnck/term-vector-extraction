@@ -140,7 +140,10 @@ async def process_document(
     #     cluster, extractors, performance=performance
     # )
 
-    new_keywords = {ex.name: ex.get_keywords(temp_doc, num=50) for ex in extractors}
+    new_keywords = {
+        ex.name: ex.get_keywords(temp_doc, num=50, with_scores=True)
+        for ex in extractors
+    }
 
     keywords.update(new_keywords)
 

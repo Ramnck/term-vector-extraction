@@ -22,7 +22,9 @@ class YAKExtractor(KeyWordExtractorBase):
             stopwords=stopwords_ru,
         )
 
-    def get_keywords(self, doc: DocumentBase, num: int = 50, **kwargs) -> list[str]:
+    def get_keywords(
+        self, doc: DocumentBase, num: int = 50, with_scores: bool = False, **kwargs
+    ) -> list[str]:
         cleaned_text = replace_words_with_custom_function(doc.text, lemmatize_ru_word)
-        out = self.y.extract_keywords(cleaned_text)
-        return [i[0] for i in out[:num]]
+        out = self.y.extract_keywords(cleaned_text)[:num]
+        return out if with_scores else [x[0] for x in out]

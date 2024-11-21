@@ -86,6 +86,10 @@ async def main(
             if skip_done and len(relevant.get(name, [])) > 3:
                 continue
 
+            # if not name.endswith(""):
+            if "_yandex" in name:
+                continue
+
             if isinstance(raw_kws, dict):
                 # kws = flatten_kws(raw_kws, "слово/фраза")
                 kws = sum(raw_kws.values(), [])

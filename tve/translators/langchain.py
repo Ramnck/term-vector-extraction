@@ -145,7 +145,7 @@ class LangChainTranslator(TranslatorBase):
         ]
 
         text = await self.make_chat_completion(messages)
-
+        # print(text)
         try:
             json_answer = json.loads(text)
         except json.JSONDecodeError:

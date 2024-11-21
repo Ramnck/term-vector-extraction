@@ -1,3 +1,4 @@
-python3.11 main.py -i clusters -o 80 -n 80
-python3.11 get_relevant.py -i clusters -o 80 -n 80
-python3.11 update_timeouts.py -n 80 -d clusters -i 80 -o 80_rel
+python get_relevant.py -i llm_ex --skip -w 10 -t 20
+python get_relevant.py -i llm_ex --skip -w 10 -t 60
+python get_relevant.py -i llm_ex --skip -w 5 -t 180
+python get_relevant.py -i llm_ex --skip -w 2 -t 600

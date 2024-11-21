@@ -1,8 +1,10 @@
 import asyncio
 import logging
 import re
+from collections import defaultdict
 from functools import cached_property
 from itertools import compress, product
+from operator import itemgetter
 
 import aiohttp
 from elasticsearch7 import (
@@ -65,6 +67,21 @@ class ESAPILoader(LoaderBase):
             f.format(l)
             for f, l in product(self.fields_without_languages, self.languages)
         ]
+
+    @cached_property
+    def _default_source_includes(self) -> list[str]:
+        _source_includes = [
+            "common.document_number",
+            "common.kind",
+            "common.publishing_office",
+            "common.publication_date",
+            "common.application",
+            "common.priority",
+            "common.classification",
+            "id",
+        ]
+
+        return _source_includes
 
     def close(self):
         old_loop = asyncio.get_event_loop()
@@ -129,38 +146,46 @@ class ESAPILoader(LoaderBase):
 
     async def find_relevant_by_keywords(
         self,
-        kws: list[str],
+        raw_kws: list[str] | list[tuple[str, float]],
         num_of_docs: int = 35,
         offset: int = 0,
         timeout: int = 30,
+        with_scores: bool = False,
     ) -> list[str]:
-        _source_includes = [
-            "common.document_number",
-            "common.kind",
-            "common.publishing_office",
-            "id",
-        ]
+        _source_includes = self._default_source_includes
 
-        kws = [
-            "".join(re.findall(r"[%\*<>,\[\]\+/0-9a-zA-Zа-яА-ЯёЁ -]", i)) for i in kws
-        ]
+        kws = set()
+        kws_dict = defaultdict(lambda: 1)
+        for raw_kw in raw_kws:
+            if isinstance(raw_kw, (tuple, list)):
+                raw_kw, score = raw_kw
+            elif isinstance(raw_kw, str):
+                score = 1
+            else:
+                raise ValueError(
+                    "Keywords must be strings or tuples of strings and floats"
+                )
 
-        kws = [re.sub(r"or|and|not", "", i.lower()) for i in kws]
+            kw = "".join(re.findall(r"[%\*,\[\]\+/0-9a-zA-Zа-яА-ЯёЁ -]", raw_kw))
+            kw = re.sub(r"or|and|not", "", kw.lower())
+            kw = re.sub(
+                r"\s+|-+",
+                lambda x: " " if " " in x.group() else "-",
+                kw,
+            ).strip(" -\n\r")
+            if kw:
+                kws.add(kw)
+                kws_dict[kw] = score
 
-        kws = [
-            re.sub(r"\s+|-+", lambda x: " " if " " in x.group() else "-", i).strip(
-                " -\n\r"
+        # kws is iterable of keywords, kws_dict is mapping of kw to score
+
+        query_string = " OR ".join(
+            map(
+                lambda x: f"({escape_elasticsearch_query(x)})"
+                + (f"^{kws_dict[x]}" if with_scores else ""),
+                kws,
             )
-            for i in kws
-        ]
-
-        kws = compress(kws, kws)
-
-        kws = dict.fromkeys(kws)
-
-        kws = [escape_elasticsearch_query(i) for i in kws]
-
-        query_string = " OR ".join(map(lambda x: f"({x})", kws))
+        )
 
         query = {
             "query": {
@@ -216,14 +241,8 @@ class ESAPILoader(LoaderBase):
     async def get_doc_by_id_date(
         self, id_date: str, timeout: int = 5
     ) -> FIPSDocument | None:
-        _source_includes = [
-            "common.document_number",
-            "common.kind",
-            "common.publishing_office",
-            "common.publication_date",
-            "common.priority",
-            "common.application",
-            "id",
+
+        _source_includes = self._default_source_includes + [
             "common.citated_docs",
             "claims",
             "claims_cleaned",
@@ -263,19 +282,7 @@ class ESAPILoader(LoaderBase):
         timeout: int = 5,
     ) -> list:
 
-        _source_includes = [
-            "common.document_number",
-            "common.kind",
-            "common.priority",
-            "common.publishing_office",
-            "common.publication_date",
-            "common.application",
-            "id",
-            "snippet",
-            # "claims",
-            # "abstract",
-            # "description",
-        ]
+        _source_includes = self._default_source_includes + ["snippet"]
 
         query = {
             "query": {
