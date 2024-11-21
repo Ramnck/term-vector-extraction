@@ -100,13 +100,13 @@ async def main(
                     f"{input_path.stem} - {name} - WRONG TYPE({type(raw_kws)})"
                 )
 
-            kws = [k for k in kws if isinstance(k, str) and len(k) > 2]
+            kws = [k for k in kws if isinstance(k, (str, list, tuple)) and len(k) > 2]
             kws = kws[:200]
             if len(kws) == 0:
                 logger.warning(f"{input_path.stem} - {name} - kws is empty")
                 continue
 
-            if any(map(lambda x: len(x) == 1, kws)):
+            if any(map(lambda x: len(x) == 1 and isinstance(x, str), kws)):
                 logger.warning(
                     f"{input_path.stem} - {name} - kws have letter instead of word"
                 )
