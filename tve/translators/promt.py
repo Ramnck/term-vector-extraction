@@ -36,7 +36,8 @@ class PROMTTranslator(TranslatorBase):
 
             req_data = f"text={q_word}&from={from_lang}&to={to_lang}&profile={profile}"
 
-            req_url = self.api_url + "/TranslateTextWithED" + "?" + req_data
+            req_url = self.api_url + "/TranslateText" + "?" + req_data
+            # req_url = self.api_url + "/TranslateTextWithED" + "?" + req_data
 
             with urllib.request.urlopen(req_url) as response:
                 out = response.read().decode(response.headers.get_content_charset())

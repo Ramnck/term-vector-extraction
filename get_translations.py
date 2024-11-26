@@ -58,8 +58,8 @@ async def process_document(
 
     outfile_path = dir_path / (data_dict["doc_id"] + ".json")
 
-    nums = [2, 3]
-    # nums = [2]
+    # nums = [2, 3]
+    nums = [2]
 
     keywords = {}
     for k, v in raw_keywords.items():
@@ -84,7 +84,7 @@ async def process_document(
                         name = []
                         name.append(extractor_name)
                         name.append(translator.name)
-                        name.append(str(num))
+                        # name.append(str(num))
                         name = "_".join(name)
 
                         if (
