@@ -9,7 +9,7 @@ import aiofiles
 
 from ..base import DocumentBase, LoaderBase
 from ..lexis import extract_number
-from .fips import FIPSDocument
+from .fips import JSONDocument
 from .xml import XMLDocument
 
 logger = logging.getLogger(__name__)
@@ -34,7 +34,7 @@ class FSLoader(LoaderBase):
 
     async def _open_file(self, path: Path | str) -> DocumentBase:
         path = Path(path)
-        docs = {".xml": XMLDocument, ".json": FIPSDocument}
+        docs = {".xml": XMLDocument, ".json": JSONDocument}
         doc = docs[path.suffix].load_file(path)
         return doc
 

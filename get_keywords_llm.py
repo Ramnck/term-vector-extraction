@@ -18,9 +18,11 @@ from tqdm.asyncio import tqdm_asyncio
 from tve.base import LoaderBase
 from tve.documents.fs import FSLoader
 from tve.pipeline import (
-    BASE_DATA_PATH,
+    DATA_PATH,
+    DOCS_PATH,
     ES_URL,
     FIPS_API_KEY,
+    PROMPTS_PATH,
     extract_keywords_from_docs,
     get_cluster_from_document,
     get_relevant,
@@ -62,7 +64,7 @@ async def main(
     if not prompt.endswith(".json"):
         prompt += ".json"
 
-    prompt = await load_data_from_json(Path(BASE_DATA_PATH) / "prompts" / prompt)
+    prompt = await load_data_from_json(PROMPTS_PATH / prompt)
 
     try:
         prompt = PromptTemplate(**prompt)
@@ -110,9 +112,9 @@ async def main(
         logger.error("Error - model not supported")
         exit(1)
 
-    input_path = BASE_DATA_PATH / "raw" / input_path
+    input_path = DOCS_PATH / input_path
     loader = FSLoader(input_path)
-    output_path = BASE_DATA_PATH / "eval" / output_path
+    output_path = DATA_PATH / output_path
     os.makedirs(output_path, exist_ok=True)
 
     paths = [i.stem for i in input_path.iterdir() if i.is_file()][:num_of_docs]

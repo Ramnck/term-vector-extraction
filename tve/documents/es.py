@@ -16,7 +16,7 @@ from elasticsearch7 import (
 
 from ..base import LoaderBase
 from ..lexis import escape_elasticsearch_query
-from .fips import FIPSDocument
+from .fips import JSONDocument
 
 logger = logging.getLogger(__name__)
 
@@ -220,7 +220,7 @@ class ESAPILoader(LoaderBase):
 
         return docs
 
-    async def get_doc(self, id: str, timeout: int = 5) -> FIPSDocument | None:
+    async def get_doc(self, id: str, timeout: int = 5) -> JSONDocument | None:
 
         match = re.search(r"([A-Z]{2})?(\d+)([A-Z]\d?)?(_\d+)?", id)
 
@@ -240,7 +240,7 @@ class ESAPILoader(LoaderBase):
 
     async def get_doc_by_id_date(
         self, id_date: str, timeout: int = 5
-    ) -> FIPSDocument | None:
+    ) -> JSONDocument | None:
 
         _source_includes = self._default_source_includes + [
             "common.citated_docs",
@@ -264,7 +264,7 @@ class ESAPILoader(LoaderBase):
                 for k in ("claims", "abstract", "description"):
                     if (k + "_cleaned") in data.keys():
                         del data[k]
-                return FIPSDocument(data)
+                return JSONDocument(data)
             except NotFoundError as ex:
                 continue
             except TransportError as ex:

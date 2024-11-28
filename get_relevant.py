@@ -18,7 +18,7 @@ from tqdm.asyncio import tqdm_asyncio
 from tve.base import LoaderBase
 from tve.documents import ESAPILoader, FIPSAPILoader, FSLoader
 from tve.pipeline import (
-    BASE_DATA_PATH,
+    DATA_PATH,
     ES_URL,
     FIPS_API_KEY,
     PROMT_IP,
@@ -56,10 +56,10 @@ async def main(
     wo_kws: bool = False,
 ):
 
-    dir_path = BASE_DATA_PATH / "eval" / input_path
+    dir_path = DATA_PATH / input_path
 
     doc_paths = [i for i in dir_path.iterdir() if i.is_file()][:num_of_docs]
-    os.makedirs(BASE_DATA_PATH / "eval" / output_path, exist_ok=True)
+    os.makedirs(DATA_PATH / output_path, exist_ok=True)
 
     progress_bar = tqdm(desc="Progress", total=len(doc_paths))
 
@@ -157,7 +157,7 @@ async def main(
                     main_tg.create_task(
                         process_document(
                             doc_path,
-                            BASE_DATA_PATH / "eval" / output_path / doc_path.name,
+                            DATA_PATH / output_path / doc_path.name,
                             task_pool,
                         )
                     )

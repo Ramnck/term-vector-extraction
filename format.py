@@ -10,7 +10,7 @@ from collections import Counter
 from itertools import product
 from pathlib import Path
 
-from tve.pipeline import BASE_DATA_PATH
+from tve.pipeline import DATA_PATH
 from tve.utils import load_data_from_json
 
 logger = logging.getLogger(__name__)
@@ -30,8 +30,8 @@ def format_id(pat_id: str) -> str:
 
 async def main(input_path: str, output_path: str | None, priority: bool = False):
     errors = Counter()
-    input_dir_path = BASE_DATA_PATH / "eval" / input_path
-    dir_path = BASE_DATA_PATH / "eval" / output_path
+    input_dir_path = DATA_PATH / input_path
+    dir_path = DATA_PATH / output_path
 
     for file_path in input_dir_path.iterdir():
         data = await load_data_from_json(file_path)

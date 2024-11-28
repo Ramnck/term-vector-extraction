@@ -43,7 +43,11 @@ handler.setLevel(logging.INFO)
 handler.setFormatter(logging.Formatter(logging_format))
 logging.getLogger().addHandler(handler)
 
-BASE_DATA_PATH = Path("data")
+BASE_PATH = Path(os.environ.get("BASE_PATH", "data"))
+DOCS_PATH = os.environ.get("DOCS_PATH", BASE_PATH / "docs")
+DATA_PATH = os.environ.get("DATA_PATH", BASE_PATH / "data")
+PROMPTS_PATH = os.environ.get("PROMPTS_PATH", BASE_PATH / "prompts")
+
 FIPS_API_KEY = os.getenv("FIPS_API_KEY")
 ES_URL = os.getenv("ES_URL")
 CACHE_DIR = Path("E:") / "FIPS" / "cache"

@@ -16,7 +16,7 @@ from tqdm.asyncio import tqdm_asyncio
 
 from tve.base import LoaderBase
 from tve.pipeline import (
-    BASE_DATA_PATH,
+    DATA_PATH,
     ES_URL,
     FIPS_API_KEY,
     PROMT_IP,
@@ -206,12 +206,12 @@ async def main(
             exit(1)
         translators.append(model)
 
-    dir_path = BASE_DATA_PATH / "eval" / input_path
+    dir_path = DATA_PATH / input_path
 
     doc_paths = [i for i in dir_path.iterdir() if i.is_file()][:num_of_docs]
 
     progress_bar = tqdm(desc="Progress", total=len(doc_paths))
-    os.makedirs(BASE_DATA_PATH / "eval" / output_path, exist_ok=True)
+    os.makedirs(DATA_PATH / output_path, exist_ok=True)
 
     def exception_handler(loop, ctx):
         ex = ctx["exception"]
@@ -228,7 +228,7 @@ async def main(
             await tg.create_task(
                 process_document(
                     data,
-                    BASE_DATA_PATH / "eval" / output_path,
+                    DATA_PATH / output_path,
                     skip_done=skip_done,
                     rewrite=rewrite,
                     sleep_time=sleep_time,

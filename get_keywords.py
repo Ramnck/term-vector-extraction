@@ -35,8 +35,9 @@ from tve.lexis import (
     make_extended_term_vec,
 )
 from tve.pipeline import (
-    BASE_DATA_PATH,
     CACHE_DIR,
+    DATA_PATH,
+    DOCS_PATH,
     ES_URL,
     FIPS_API_KEY,
     extract_keywords_from_docs,
@@ -105,9 +106,7 @@ async def process_document(
 
     # cluster = await get_cluster_from_document(doc, loader, timeout=180, max_docs=40)
 
-    path_of_file = (
-        BASE_DATA_PATH / "eval" / name_of_experiment / (doc.id_date + ".json")
-    )
+    path_of_file = DATA_PATH / name_of_experiment / (doc.id_date + ".json")
 
     old_data = await load_data_from_json(path_of_file) if rewrite else None
 
@@ -189,7 +188,7 @@ async def process_path(
 
     data = (
         await load_data_from_json(
-            BASE_DATA_PATH / "eval" / name_of_experiment / (doc.id_date + ".json")
+            DATA_PATH / name_of_experiment / (doc.id_date + ".json")
         )
         if rewrite
         else {}
@@ -229,9 +228,7 @@ async def process_path(
 
     data["keywords"] = keywords
 
-    path_of_file = (
-        BASE_DATA_PATH / "eval" / name_of_experiment / (doc.id_date + ".json")
-    )
+    path_of_file = DATA_PATH / name_of_experiment / (doc.id_date + ".json")
     if await save_data_to_json(data, path_of_file):
         logger.error("Error occured while saving %s file" % path_of_file.name)
 
@@ -256,7 +253,7 @@ async def main(
 
     docs = [doc async for doc in loader][:num_of_docs]
 
-    os.makedirs(BASE_DATA_PATH / "eval" / name_of_experiment, exist_ok=True)
+    os.makedirs(DATA_PATH / name_of_experiment, exist_ok=True)
 
     progress_bar = tqdm(desc="Progress", total=len(docs))
 
@@ -288,9 +285,7 @@ async def main(
             out = f"{extractor_name} : {round(mean_time, 2)} s"
             logger.info(out)
 
-        path_of_file = (
-            BASE_DATA_PATH / "eval" / (name_of_experiment + "_performance.json")
-        )
+        path_of_file = DATA_PATH / (name_of_experiment + "_performance.json")
         if await save_data_to_json(performance, path_of_file):
             logger.error("Error occured while saving %s file" % path_of_file.name)
 
@@ -308,7 +303,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     api = FIPSAPILoader(FIPS_API_KEY)
-    loader = FSLoader(Path("data") / "raw" / args.input, CACHE_DIR, api)
+    loader = FSLoader(DOCS_PATH / args.input, CACHE_DIR, api)
 
     if args.output is None:
         args.output = args.input
