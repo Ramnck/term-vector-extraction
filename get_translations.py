@@ -133,6 +133,12 @@ async def process_document(
 
     data_dict["keywords"] = new_keywords
 
+    if rewrite:
+        data_dict_to_save = await load_data_from_json(outfile_path)
+        if data_dict_to_save:
+            data_dict["keywords"] = data_dict_to_save["keywords"]
+            data_dict["keywords"].update(new_keywords)
+
     if await save_data_to_json(data_dict, outfile_path):
         raise RuntimeError("Error saving file %s" % outfile_path)
     time.sleep(sleep_time)

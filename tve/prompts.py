@@ -46,7 +46,7 @@ t = (
 )
 # ans = 'Give me the answer in JSON format where key is input terms/phrases, value is list of suggestions. Example: {"<term/phrase>": [<list of suggestions>]}.'
 ans = 'Give me a short and unexplained answer in JSON format, where key is the input term/collocation, value is a list of sentences. Response format: {"<term/collocation>": ["<suggestion 1>", "<suggestion 2>"]}'
-e = "Here is set of terms/collocation:"
+e = "Here is set of terms/collocations:"
 
 en_expand_prompt = PromptTemplate(role=r, task=t, answer_format=ans, tail=e)
 
