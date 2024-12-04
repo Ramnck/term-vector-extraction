@@ -1,0 +1,6 @@
+{
+    "role": "You are given the text of a patent document.",
+    "task": "Your task is to read the text and provide me with {} key words/ collocations that most accurately represent the meaning of the text. Do not make very long sentences. Each keyword collocation should consist of a maximum of 3 words.",
+    "answer_format": "Answer briefly, without explanations. Your answer is a comma separated list of key words/ collocations.",
+    "tail": "Text:"
+}

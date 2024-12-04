@@ -68,7 +68,7 @@ async def process_document(
             logger.warning(f"No keywords for {k} in {data_dict['doc_id']}")
             continue
         if isinstance(v[0], list):
-            v = v[0]
+            v = [i[0] for i in v]
         keywords[k] = v[:50]
 
     old_data = (await load_data_from_json(outfile_path)) if rewrite else None
@@ -93,7 +93,8 @@ async def process_document(
                             and len(new_keywords.get(name, [])) > 3
                         ):
                             continue
-
+                        if len(kws) == 0:
+                            continue
                         flat_kws = flatten_kws(kws)
                         tr = tg.create_task(
                             translator.translate_list(
@@ -206,6 +207,7 @@ async def main(
             from tve.translators.promt import PROMTTranslator
 
             model = PROMTTranslator(PROMT_IP)
+            model.name = "promt"
 
         else:
             logger.error("Error - model not supported")

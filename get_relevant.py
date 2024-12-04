@@ -89,12 +89,12 @@ async def main(
                 continue
 
             # if not name.endswith(""):
-            if "_yandex" in name:
-                continue
+            # if "_yandex" in name:
+            # continue
 
             if isinstance(raw_kws, dict):
-                # kws = flatten_kws(raw_kws, "слово/фраза")
-                kws = sum(raw_kws.values(), [])
+                kws = flatten_kws(raw_kws, "слово/фраза")
+                # kws = sum(raw_kws.values(), [])
             elif isinstance(raw_kws, list):
                 kws = raw_kws
             else:

@@ -112,6 +112,8 @@ def flatten_kws(input_data, stopword: str = "") -> list[str]:
             return sum(map(recursive_unwrap, data), [])
         elif isinstance(data, str):
             return [data]
+        else:
+            return []
 
     out = []
 
