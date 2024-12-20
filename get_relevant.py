@@ -184,7 +184,7 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--number", default=None, type=int)
     parser.add_argument("-w", "--num-of-workers", default=5, type=int)
     parser.add_argument("--no-rewrite", action="store_true", default=False)
-    parser.add_argument("--skip", "--skip-done", action="store_true", default=False)
+    parser.add_argument("--no-skip", action="store_true", default=False)
     parser.add_argument("-t", "--timeout", default=90, type=int)
     parser.add_argument("--wo-kws", action="store_true", default=False)
     parser.add_argument("--scores", action="store_true", default=False)
@@ -205,7 +205,7 @@ if __name__ == "__main__":
         args.input,
         args.output,
         args.num_of_workers,
-        skip_done=args.skip,
+        skip_done=not args.no_skip,
         rewrite=not args.no_rewrite,
         timeout=args.timeout,
         with_scores=args.scores,

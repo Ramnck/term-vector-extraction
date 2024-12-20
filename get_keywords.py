@@ -298,7 +298,7 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--number", default=None, type=int)
     parser.add_argument("-w", "--num-of-workers", default=1, type=int)
     parser.add_argument("--no-rewrite", action="store_true", default=False)
-    parser.add_argument("--skip", "--skip-done", action="store_true", default=False)
+    parser.add_argument("--no-skip", action="store_true", default=False)
 
     args = parser.parse_args()
 
@@ -315,7 +315,7 @@ if __name__ == "__main__":
         args.number,
         args.output,
         args.num_of_workers,
-        skip_done=args.skip,
+        skip_done=not args.no_skip,
         rewrite=not args.no_rewrite,
     )
     asyncio.run(coro)

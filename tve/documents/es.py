@@ -144,17 +144,10 @@ class ESAPILoader(LoaderBase):
         #     async with
         pass
 
-    async def find_relevant_by_keywords(
-        self,
-        raw_kws: list[str] | list[tuple[str, float]],
-        num_of_docs: int = 35,
-        offset: int = 0,
-        timeout: int = 30,
-        with_scores: bool = False,
-    ) -> list[str]:
-        _source_includes = self._default_source_includes
-
-        kws = set()
+    @classmethod
+    def _process_raw_kws(
+        cls, raw_kws: list[str] | list[tuple[str, float]], with_scores: bool = False
+    ) -> list[tuple[str, float]]:
         kws_dict = defaultdict(lambda: 1)
         for raw_kw in raw_kws:
             if isinstance(raw_kw, (tuple, list)):
@@ -166,26 +159,64 @@ class ESAPILoader(LoaderBase):
                     "Keywords must be strings or tuples of strings and floats"
                 )
 
-            kw = "".join(re.findall(r"[%\*,\[\]\+/0-9a-zA-Zа-яА-ЯёЁ -]", raw_kw))
-            kw = re.sub(r"or|and|not", "", kw.lower())
+            kw = "".join(
+                re.findall(r"[%\*,\[\]\+/0-9a-zA-Zа-яА-ЯёЁ -]", raw_kw)
+            )  # remain only allowed symbols
+            kw = re.sub(
+                r"or|and|not", "", kw.lower()
+            )  # logical operator are not allowed
             kw = re.sub(
                 r"\s+|-+",
                 lambda x: " " if " " in x.group() else "-",
                 kw,
-            ).strip(" -\n\r")
+            ).strip(
+                " -\n\r"
+            )  # delete muliple "-" or spaces
             if kw:
-                kws.add(kw)
                 kws_dict[kw] = score
+        if with_scores:
+            return list(kws_dict.items())
+        else:
+            return list(kws_dict.keys())
 
-        # kws is iterable of keywords, kws_dict is mapping of kw to score
+    @classmethod
+    def _make_query_string(
+        cls, kws: list[str] | list[tuple[str, float]], with_scores: bool = False
+    ) -> str:
+        if len(kws) == 0:
+            return ""
 
-        query_string = " OR ".join(
+        kws_scores_dict = defaultdict(lambda: 1)
+
+        if isinstance(kws[0], (tuple, list)):
+            kws_scores_dict = {i[0]: i[1] for i in kws}
+            kws = [i[0] for i in kws]
+        elif isinstance(kws[0], str):
+            pass
+        else:
+            raise ValueError("Keywords must be strings or tuples of strings and floats")
+
+        return " OR ".join(
             map(
                 lambda x: f"({escape_elasticsearch_query(x)})"
-                + (f"^{kws_dict[x]}" if with_scores else ""),
+                + (f"^{kws_scores_dict[x]}" if with_scores else ""),
                 kws,
             )
         )
+
+    async def find_relevant_by_keywords(
+        self,
+        raw_kws: list[str] | list[tuple[str, float]],
+        num_of_docs: int = 35,
+        offset: int = 0,
+        timeout: int = 30,
+        with_scores: bool = False,
+    ) -> list[str]:
+        _source_includes = self._default_source_includes
+
+        kws = self._process_raw_kws(raw_kws, with_scores)
+
+        query_string = self._make_query_string(kws, with_scores)
 
         query = {
             "query": {

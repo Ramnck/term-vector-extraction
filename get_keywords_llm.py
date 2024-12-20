@@ -166,7 +166,7 @@ async def main(
                     f"Exception in make_chat_completion - {doc_id} - {model.name} - {ex}"
                 )
 
-        kws = list(dict.fromkeys((i.strip() for i in kws if i.strip())))
+            kws = list(dict.fromkeys((i.strip() for i in kws if i.strip())))
 
         data["keywords"][model.name] = kws
 
@@ -201,7 +201,7 @@ if __name__ == "__main__":
     parser.add_argument("-p", "--prompt", required=True)
     parser.add_argument("-i", "--input", required=True)
     parser.add_argument("-o", "--output", default=None)
-    parser.add_argument("--skip", "--skip-done", action="store_true", default=False)
+    parser.add_argument("--no-skip", action="store_true", default=False)
     parser.add_argument("-n", "--number", default=None, type=int)
     parser.add_argument("-w", "--num-of-workers", default=10, type=int)
     parser.add_argument("--no-rewrite", action="store_true", default=False)
@@ -224,7 +224,7 @@ if __name__ == "__main__":
         args.input,
         args.output,
         args.num_of_workers,
-        skip_done=args.skip,
+        skip_done=not args.no_skip,
         rewrite=not args.no_rewrite,
         return_json=args.json,
         sleep_time=args.sleep,

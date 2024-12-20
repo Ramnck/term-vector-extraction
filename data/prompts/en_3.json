@@ -1,0 +1,6 @@
+{
+    "role": "You are given the text of a patent document.",
+    "task": "Your task is to read the text and provide me with {} key words/collocations in English that most accurately reflect the meaning of the text. Add to each key word/collocation no more than two words/collocations not longer than 3 words in English, most frequently occurring in technical and patent documents together with this word and contextually close to it, try to offer the most diverse variants.",
+    "answer_format": "Answer briefly, without explanations. Your answer is a JSON object of keywords and contextually similar word combinations. Format: {“keyword”: [“added word/collocation 1”, “added word/collocation 2”]}.",
+    "tail": "Text:"
+}

@@ -70,10 +70,17 @@ def lemmatize_ru_word(word: str) -> str:
     return morph.normal_forms(word)[0]
 
 
-with open(Path("data") / "SimilarStopWords.txt", encoding="utf-8") as file:
-    stopwords_iteco = [i.strip() for i in file]
-with open(Path("data") / "MyStopWords.txt", encoding="utf-8") as file:
-    stopwords_my = [i.strip() for i in file]
+try:
+    with open(Path("data") / "SimilarStopWords.txt", encoding="utf-8") as file:
+        stopwords_iteco = [i.strip() for i in file]
+except FileNotFoundError:
+    stopwords_iteco = []
+
+try:
+    with open(Path("data") / "MyStopWords.txt", encoding="utf-8") as file:
+        stopwords_my = [i.strip() for i in file]
+except FileNotFoundError:
+    stopwords_my = []
 stopwords_nltk_ru = list(nltk.corpus.stopwords.words("russian"))
 stopwords_ru = list(set(chain(stopwords_my, stopwords_nltk_ru, stopwords_iteco)))
 
