@@ -1,3 +1,18 @@
+"""
+This module provides stopwords and functions for processing Russian and English text.
+#### Lexic functions:
+- replace_words_with_custom_function (apply custom function to words in text)
+- lemmatize_doc (lemmatize document and exclude stopwords)
+- lemmatize_ru_word (lemmatize one Russian word)
+- pos_tags_ru/pos_tags_en (get POS tags for Russian/English word)
+#### Patent ID functions:
+- extract_number (extract number of patent from ID)
+- extract_citaions (uses RegEx to extract citaions from text)
+#### Utils:
+- make_extended_term_vec (accumulate several term vectors into one)
+- escape_elasticsearch_query (make query suitable for Elasticsearch)
+"""
+
 import re
 import time
 from itertools import chain, compress, cycle

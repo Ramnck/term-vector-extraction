@@ -1,3 +1,7 @@
+"""
+This module provides a document loader for Elasticsearch. (ESAPILoader)
+"""
+
 import asyncio
 import logging
 import re
@@ -24,6 +28,11 @@ logging.getLogger("elasticsearch").setLevel(logging.ERROR)
 
 
 class ESAPILoader(LoaderBase):
+    """
+    This class provides a document loader for Elasticsearch.
+    Don`t forget to close the connection after using it. (await loader.es.close())
+    """
+
     def __init__(
         self,
         elastic_ip: str | None,
@@ -84,6 +93,7 @@ class ESAPILoader(LoaderBase):
         return _source_includes
 
     def close(self):
+        """Close the Elasticsearch connection."""
         old_loop = asyncio.get_event_loop()
         if old_loop.is_closed():
             new_loop = asyncio.new_event_loop()
@@ -94,36 +104,36 @@ class ESAPILoader(LoaderBase):
         else:
             old_loop.run_until_complete(self.es.close())
 
-    async def get_document_list_from_range(
-        self,
-        from_date: str,
-        to_date: str,
-        take_every: int = 100,
-        kind: str = "(A1 or B2)",
-        timeout: int = 60 * 2,
-    ) -> list[str]:
+        # async def get_document_list_from_range(
+        #     self,
+        #     from_date: str,
+        #     to_date: str,
+        #     take_every: int = 100,
+        #     kind: str = "(A1 or B2)",
+        #     timeout: int = 60 * 2,
+        # ) -> list[str]:
 
-        url = self.document_api_url + "/API/query/"
+        #     url = self.document_api_url + "/API/query/"
 
-        data = {
-            "DP1": from_date,
-            "DP2": to_date,
-            "KI": kind,
-            "TakeXpart": take_every,
-            "freetext": "",
-        }
+        #     data = {
+        #         "DP1": from_date,
+        #         "DP2": to_date,
+        #         "KI": kind,
+        #         "TakeXpart": take_every,
+        #         "freetext": "",
+        #     }
 
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": self.doc_api_key,
-        }
+        #     headers = {
+        #         "Content-Type": "application/json",
+        #         "Authorization": self.doc_api_key,
+        #     }
 
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                url=url, data=data, timeout=timeout, headers=headers
-            ) as res:
-                out = await res.json()
-                return out.get("IDs", [])
+        #     async with aiohttp.ClientSession() as session:
+        #         async with session.post(
+        #             url=url, data=data, timeout=timeout, headers=headers
+        #         ) as res:
+        #             out = await res.json()
+        #             return out.get("IDs", [])
 
         # async def get_cluster_from_document(self, doc: str | DocumentBase, timeout: int = 60 * 2) -> list[XMLDocument]:
         #     if isinstance(doc, str):
@@ -212,6 +222,7 @@ class ESAPILoader(LoaderBase):
         timeout: int = 30,
         with_scores: bool = False,
     ) -> list[str]:
+        """Find relevant documents by keywords."""
         _source_includes = self._default_source_includes
 
         kws = self._process_raw_kws(raw_kws, with_scores)
@@ -252,7 +263,7 @@ class ESAPILoader(LoaderBase):
         return docs
 
     async def get_doc(self, id: str, timeout: int = 5) -> JSONDocument | None:
-
+        """Try to find a document by its ID. (trying to find the closest match if exists)"""
         match = re.search(r"([A-Z]{2})?(\d+)([A-Z]\d?)?(_\d+)?", id)
 
         pub_office = match.group(1)
@@ -272,7 +283,7 @@ class ESAPILoader(LoaderBase):
     async def get_doc_by_id_date(
         self, id_date: str, timeout: int = 5
     ) -> JSONDocument | None:
-
+        """Get a document by its ID and date. You must provide the correct ID and date. Otherwise return None."""
         _source_includes = self._default_source_includes + [
             "common.citated_docs",
             "claims",

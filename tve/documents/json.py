@@ -1,3 +1,8 @@
+"""
+This module provides a read-only class for handling JSON patent documents. (JSONDocument)
+document can be modified via document.raw_json
+"""
+
 import json
 import re
 import xml.etree.ElementTree as ET
@@ -32,7 +37,6 @@ class JSONDocument(DocumentBase):
     @cached_property
     def citations(self) -> list[str]:
         cites = [i["id"] for i in self.raw_json["common"].get("citated_docs", [])]
-        # "biblio": {"ru": {"citations":
         cites += extract_citaions(self._raw_citation_field)
         return list(dict.fromkeys(cites))
 
@@ -72,8 +76,15 @@ class JSONDocument(DocumentBase):
             json_text = json_block.get("en", None)
 
         if json_text:
+            output = ""
             xml = ET.fromstring(json_text)
-            return " ".join(i.text for i in xml if i.text is not None)
+            for i in xml:
+                if i.text:
+                    output += i.text + " "
+                for j in i:
+                    if j.text:
+                        output += j.text + " "
+            return output
         else:
             return ""
 

@@ -260,6 +260,8 @@ class KeyBERTModel:
 
 
 class KeyBERTExtractor(KeyWordExtractorBase):
+    """Keyword extractor which can use SentenceTransformer or your own KeyBERTModel implementation as underlying model."""
+
     def __init__(
         self,
         model: str | KeyBERTModel | Any | SentenceTransformer,

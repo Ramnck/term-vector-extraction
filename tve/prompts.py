@@ -1,3 +1,8 @@
+"""
+This module provides a dataclass for defining Prompts (PromptTemplate)
+And some usage examples
+"""
+
 from dataclasses import dataclass
 
 

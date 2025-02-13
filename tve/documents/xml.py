@@ -1,3 +1,8 @@
+"""
+This module provides a read-only class for handling XML patent documents. (XMLDocument)
+document can be modified via document.raw_xml
+"""
+
 import re
 import xml.etree.ElementTree as ET
 from enum import StrEnum
@@ -17,13 +22,13 @@ class XMLDocument(DocumentBase):
 
     def __init__(self, raw: ET.Element | str) -> None:
         if isinstance(raw, ET.Element):
-            self.xml_obj = raw
+            self.raw_xml = raw
         else:
-            self.xml_obj = ET.fromstring(raw)
+            self.raw_xml = ET.fromstring(raw)
 
     @cached_property
     def _freeformat_citations_field(self) -> str:
-        tag = self.xml_obj.find(XMLDocument.Namespace.pat + "BibliographicData")
+        tag = self.raw_xml.find(XMLDocument.Namespace.pat + "BibliographicData")
         tag = tag.find(XMLDocument.Namespace.pat + "ReferenceCitationBag")
         refs = []
         if tag is None:
@@ -45,7 +50,7 @@ class XMLDocument(DocumentBase):
         citations = extract_citaions(citations_free)
 
         if len(citations) == 0:
-            tag = self.xml_obj.find(XMLDocument.Namespace.pat + "BibliographicData")
+            tag = self.raw_xml.find(XMLDocument.Namespace.pat + "BibliographicData")
             tag = tag.find(XMLDocument.Namespace.pat + "ReferenceCitationBag")
             if tag is not None:
                 for ref_cite in tag.findall(
@@ -92,7 +97,7 @@ class XMLDocument(DocumentBase):
 
     @cached_property
     def description(self) -> str:
-        description = self.xml_obj.find(XMLDocument.Namespace.pat + "Description")
+        description = self.raw_xml.find(XMLDocument.Namespace.pat + "Description")
         if description is None:
             return ""
         description = " ".join([i.text for i in description if i.text is not None])
@@ -100,7 +105,7 @@ class XMLDocument(DocumentBase):
 
     @cached_property
     def claims(self) -> str:
-        claims_root = self.xml_obj.find(XMLDocument.Namespace.pat + "Claims")
+        claims_root = self.raw_xml.find(XMLDocument.Namespace.pat + "Claims")
 
         if claims_root is None:
             return ""
@@ -117,7 +122,7 @@ class XMLDocument(DocumentBase):
     @cached_property
     def abstract(self) -> str:
         abstracts = []
-        for abstract in self.xml_obj.findall(XMLDocument.Namespace.pat + "Abstract"):
+        for abstract in self.raw_xml.findall(XMLDocument.Namespace.pat + "Abstract"):
             for p in abstract:
                 if p.text is not None:
                     abstracts.append(p.text)
@@ -141,10 +146,10 @@ class XMLDocument(DocumentBase):
             else:
                 return c.text + n.text.lstrip("0") + k.text
 
-        id_temp = extract_id(self.xml_obj)
+        id_temp = extract_id(self.raw_xml)
 
         if id_temp is None:
-            tag = self.xml_obj.find(XMLDocument.Namespace.pat + "BibliographicData")
+            tag = self.raw_xml.find(XMLDocument.Namespace.pat + "BibliographicData")
             tags = tag.findall(
                 XMLDocument.Namespace.pat + "PatentPublicationIdentification"
             )
@@ -158,9 +163,9 @@ class XMLDocument(DocumentBase):
 
     @cached_property
     def date(self) -> str:
-        tag = self.xml_obj.find(XMLDocument.Namespace.com + "PublicationDate")
+        tag = self.raw_xml.find(XMLDocument.Namespace.com + "PublicationDate")
         if tag is None:
-            tag = self.xml_obj.find(XMLDocument.Namespace.pat + "BibliographicData")
+            tag = self.raw_xml.find(XMLDocument.Namespace.pat + "BibliographicData")
             tags = tag.findall(
                 XMLDocument.Namespace.pat + "PatentPublicationIdentification"
             )
@@ -173,7 +178,7 @@ class XMLDocument(DocumentBase):
 
     @cached_property
     def cluster(self) -> list[str]:
-        xml = self.xml_obj
+        xml = self.raw_xml
         out = list()
 
         raw_str_xmls = list()
@@ -214,7 +219,7 @@ class XMLDocument(DocumentBase):
             path /= self.id_date + ".xml"
 
         with open(path, "w+", encoding="utf-8") as file:
-            string = ET.tostring(self.xml_obj, encoding="unicode")
+            string = ET.tostring(self.raw_xml, encoding="unicode")
             file.write(string)
 
     @classmethod

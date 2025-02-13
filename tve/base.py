@@ -1,3 +1,13 @@
+"""
+This is a module which contains all base interfaces for the TVE project.
+#### Interfaces:
+- DocumentBase: handling patent documents
+- KeyWordExtractorBase: extracting keywords
+- LoaderBase: loading and searching patent documents (by ID or keywords)
+- EmbedderBase: extracting embeddings from document
+- TranslatorBase: translating term-vectors or expanding them (using LLMs) 
+"""
+
 from abc import ABC
 
 import numpy as np

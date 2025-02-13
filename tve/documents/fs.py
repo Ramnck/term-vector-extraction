@@ -1,3 +1,7 @@
+"""
+This module provides a document loader for FileSystem (FSLoader)
+"""
+
 import logging
 import os
 import random
@@ -22,6 +26,11 @@ class FSLoader(LoaderBase):
         cache_path: str | Path | None = None,
         api_to_load_files: LoaderBase | None = None,
     ) -> None:
+        """
+        - path - is a path where to find and iterate over files
+        - cache_path - is a path where to find and where to save files if api_to_load_files is specified
+        - api_to_load_files - is an LoaderBase instance where to download files
+        """
         self.init_path = Path(path).absolute()
         self.api = api_to_load_files
 
@@ -41,6 +50,10 @@ class FSLoader(LoaderBase):
     async def get_doc(
         self, id_date: str, check_cache: bool = True, timeout: int = 10
     ) -> DocumentBase | None:
+        """Try to find a document by its ID. (trying to find the closest match if exists)
+        - if there is cache_path then it will also check it
+        - if there is api_to_load_files then it will make an api.get_doc call
+        """
         # num_of_doc = extract_number(id_date).lstrip("0")
         start_paths = [self.init_path]
         if self.cache_path and check_cache:

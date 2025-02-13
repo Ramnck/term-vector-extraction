@@ -58,7 +58,6 @@ async def main(
     skip_done: bool = False,
     rewrite: bool = True,
     return_json: bool = False,
-    sleep_time: float = 0.0,
 ):
 
     if not prompt.endswith(".json"):
@@ -191,31 +190,20 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Get keywords using proprietary llm")
 
-    # parser.add_argument("-m", "--model", default="y")
-    # parser.add_argument("-p", "--prompt", default="ru_3")
-    # parser.add_argument("-i", "--input", default="l")
-    # parser.add_argument("-o", "--output", default="llm_ex")
-    # parser.add_argument("--skip", "--skip-done", action="store_true", default=True)
-
     parser.add_argument("-m", "--model", required=True)
     parser.add_argument("-p", "--prompt", required=True)
     parser.add_argument("-i", "--input", required=True)
     parser.add_argument("-o", "--output", default=None)
     parser.add_argument("--no-skip", action="store_true", default=False)
+    parser.add_argument("--no-rewrite", action="store_true", default=False)
     parser.add_argument("-n", "--number", default=None, type=int)
     parser.add_argument("-w", "--num-of-workers", default=10, type=int)
-    parser.add_argument("--no-rewrite", action="store_true", default=False)
     parser.add_argument("-j", "--json", action="store_true", default=False)
-    parser.add_argument("--sleep", type=float, default=0.0)
 
     args = parser.parse_args()
 
-    # api = FipsAPI(FIPS_API_KEY)
-    # api = InternalESAPI(ES_URL)
-    # loader = FileSystem(Path("data") / "raw" / args.docs)
-
     if args.output is None:
-        args.output = args.input + "_trans"
+        args.output = args.input
 
     coro = main(
         args.model,
@@ -227,6 +215,5 @@ if __name__ == "__main__":
         skip_done=not args.no_skip,
         rewrite=not args.no_rewrite,
         return_json=args.json,
-        sleep_time=args.sleep,
     )
     asyncio.run(coro)

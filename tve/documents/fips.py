@@ -1,3 +1,7 @@
+""" 
+This module provides a document loader for FIPS API located on https://searchplatform.rospatent.gov.ru/. (FIPSAPILoader)
+"""
+
 import json
 import logging
 import random
@@ -50,6 +54,7 @@ class FIPSAPILoader(LoaderBase):
                     return {}
 
     async def get_doc(self, id: str, timeout: int = 10) -> JSONDocument | None:
+        """Try to find a document by its ID. (trying to find the closest match if exists)"""
         pub_office = re.search(r"[A-Z]{2}", id)
         num_of_doc = extract_number(id).lstrip("0")
 
@@ -78,6 +83,7 @@ class FIPSAPILoader(LoaderBase):
     async def get_doc_by_id_date(
         self, id_date: str, timeout: int = 5
     ) -> JSONDocument | None:
+        """Get a document by its ID and date. You must provide the correct ID and date. Otherwise return None."""
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 self.api_url + "docs/" + id_date, headers=self._headers, timeout=timeout
@@ -100,6 +106,7 @@ class FIPSAPILoader(LoaderBase):
     async def find_relevant_by_keywords(
         self, kws: list[str], num_of_docs: int = 35, offset: int = 0, timeout: int = 30
     ) -> list[str]:
+        """Find relevant documents by keywords."""
         res = await self._search_query(
             q=" OR ".join(compress(kws, kws)),
             offset=offset,

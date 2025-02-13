@@ -1,3 +1,19 @@
+"""
+Importing this module sets up a default logging system and sets env variables.
+This module contains blocks for constructing experiments.
+#### Env variables for data processing pipeline:
+- BASE_PATH
+- DATA_PATH
+- DOCS_PATH
+- PROMPTS_PATH
+- LOGS_PATH
+#### Env variables for other classes
+- FIPS_API_KEY
+- ES_URL
+- PROMT_IP
+- CACHE_DIR
+"""
+
 import logging
 import os
 import random
@@ -19,11 +35,23 @@ from .lexis import (
 )
 from .utils import ForgivingTaskGroup, batched, flatten_kws
 
+BASE_PATH = Path(os.environ.get("BASE_PATH", "data"))
+DOCS_PATH = os.environ.get("DOCS_PATH", BASE_PATH / "docs")
+DATA_PATH = os.environ.get("DATA_PATH", BASE_PATH / "data")
+LOGS_PATH = os.environ.get("LOGS_PATH", BASE_PATH / "logs")
+PROMPTS_PATH = os.environ.get("PROMPTS_PATH", BASE_PATH / "prompts")
+
+FIPS_API_KEY = os.getenv("FIPS_API_KEY")
+ES_URL = os.getenv("ES_URL")
+CACHE_DIR = BASE_PATH / "cache"
+PROMT_IP = os.getenv("PROMT_IP")
+
+
 name = [Path(sys.argv[0]).name] + sys.argv[1:]
 filename = " ".join(name)
 filename = re.sub(r'[\\/:*?"<>|]', "", filename)
 
-filepath = Path("data") / "logs" / filename
+filepath = LOGS_PATH / filename
 filepath = filepath.parent / (filepath.name + ".log.txt")
 
 logging_format = "%(name)s - %(asctime)s - %(levelname)s - %(message)s"
@@ -42,16 +70,6 @@ handler = logging.StreamHandler(sys.stdout)
 handler.setLevel(logging.INFO)
 handler.setFormatter(logging.Formatter(logging_format))
 logging.getLogger().addHandler(handler)
-
-BASE_PATH = Path(os.environ.get("BASE_PATH", "data"))
-DOCS_PATH = os.environ.get("DOCS_PATH", BASE_PATH / "docs")
-DATA_PATH = os.environ.get("DATA_PATH", BASE_PATH / "data")
-PROMPTS_PATH = os.environ.get("PROMPTS_PATH", BASE_PATH / "prompts")
-
-FIPS_API_KEY = os.getenv("FIPS_API_KEY")
-ES_URL = os.getenv("ES_URL")
-CACHE_DIR = Path("E:") / "FIPS" / "cache"
-PROMT_IP = os.getenv("PROMT_IP")
 
 
 async def get_cluster_from_document(

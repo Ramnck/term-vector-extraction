@@ -1,3 +1,17 @@
+"""
+This module provides some utility functions and classes
+#### Async task groups:
+- ForgivingTaskGroup
+- CircularTaskGroup
+#### Modifying collections:
+- batched
+- flatten_kws
+#### File system:
+- save_data_to_json
+- load_data_from_json
+
+"""
+
 import asyncio
 import json
 from pathlib import Path
