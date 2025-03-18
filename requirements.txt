@@ -51,3 +51,7 @@ typing_extensions==4.12.2
 urllib3==2.2.2
 yake @ git+https://github.com/LIAAD/yake@0fa58cceb465162b6bd0cab7ec967edeb907fbcc
 yarl==1.9.4
+elasticsearch7
+langchain_core
+langchain_openai
+fix_busted_json
