@@ -1,13 +1,12 @@
 # Core numerical libraries
-numpy==1.22.0
+numpy==1.26.4
 pandas==1.3.5
 
 # Machine learning and vectorization tools
 scikit-learn==1.0.2
 
 # Natural language processing libraries (if needed)
-nltk==3.6.7
-spacy==3.1.3
+nltk==3.8.1
 pymorphy3
 cupy
 scikit-learn
