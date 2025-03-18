@@ -4,7 +4,6 @@ from typing import Any, Callable, List, Tuple
 
 import numpy as np
 import torch
-from keybert import KeyBERT
 from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity

@@ -3,7 +3,6 @@ This module provides a read-only class for handling XML patent documents. (XMLDo
 document can be modified via document.raw_xml
 """
 
-import re
 import xml.etree.ElementTree as ET
 from enum import StrEnum
 from functools import cached_property

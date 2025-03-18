@@ -5,12 +5,10 @@ import os
 import re
 
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
-import aiohttp
 from llama_cpp import Llama
 
 from ..base import TranslatorBase
 from ..prompts import en_translate, ru_translate
-from ..utils import ForgivingTaskGroup
 
 logger = logging.getLogger(__name__)
 

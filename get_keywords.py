@@ -4,36 +4,17 @@ os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
 import argparse
 import asyncio
-import json
 import logging
 import random
-import sys
-import time
-from itertools import chain, cycle
 from pathlib import Path
 
-import aiofiles
 import numpy as np
 from dotenv import load_dotenv
-from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
-from tqdm.asyncio import tqdm_asyncio
 
-from tve.base import DocumentBase, KeyWordExtractorBase, LoaderBase
+from tve.base import DocumentBase, LoaderBase
 from tve.documents import BlankDoc, FIPSAPILoader, FSLoader
-from tve.extractors import (
-    KeyBERTExtractor,
-    KeyBERTModel,
-    RuLongrormerEmbedder,
-    TransformerEmbedder,
-    YAKExtractor,
-)
-from tve.lexis import (
-    clean_ru_text,
-    extract_number,
-    lemmatize_ru_word,
-    make_extended_term_vec,
-)
+from tve.extractors import YAKExtractor
 from tve.pipeline import (
     CACHE_DIR,
     DATA_PATH,

@@ -1,13 +1,7 @@
 import yake
 
 from ..base import DocumentBase, KeyWordExtractorBase
-from ..lexis import (
-    clean_ru_text,
-    lemmatize_doc,
-    lemmatize_ru_word,
-    replace_words_with_custom_function,
-    stopwords_ru,
-)
+from ..lexis import lemmatize_ru_word, replace_words_with_custom_function, stopwords_ru
 
 
 class YAKExtractor(KeyWordExtractorBase):

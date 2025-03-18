@@ -1,18 +1,12 @@
 import argparse
 import asyncio
-import json
 import logging
 import os
 import re
-import sys
 import time
-from itertools import product
 from pathlib import Path
 
-import aiofiles
-import numpy as np
 from tqdm import tqdm
-from tqdm.asyncio import tqdm_asyncio
 
 from tve.base import LoaderBase
 from tve.pipeline import (
@@ -25,7 +19,7 @@ from tve.pipeline import (
     get_relevant,
     test_different_vectors,
 )
-from tve.prompts import PromptTemplate, en_expand_prompt, ru_expand_prompt
+from tve.prompts import en_expand_prompt, ru_expand_prompt
 from tve.utils import (
     CircularTaskGroup,
     ForgivingTaskGroup,

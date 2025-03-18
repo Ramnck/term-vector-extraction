@@ -15,8 +15,7 @@ This module provides some utility functions and classes
 import asyncio
 import json
 from pathlib import Path
-from types import TracebackType
-from typing import Callable, Iterable
+from typing import Callable
 
 import aiofiles
 from tqdm import tqdm

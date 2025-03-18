@@ -9,8 +9,6 @@ import re
 from itertools import compress
 from pathlib import Path
 
-import aiofiles
-
 from ..base import DocumentBase, LoaderBase
 from ..lexis import extract_number
 from .fips import JSONDocument

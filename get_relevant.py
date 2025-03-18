@@ -3,20 +3,11 @@ import asyncio
 import json
 import logging
 import os
-import re
-import sys
-import time
-from itertools import compress, product
-from operator import itemgetter
-from pathlib import Path
 
-import aiofiles
-import numpy as np
 from tqdm import tqdm
-from tqdm.asyncio import tqdm_asyncio
 
 from tve.base import LoaderBase
-from tve.documents import ESAPILoader, FIPSAPILoader, FSLoader
+from tve.documents import ESAPILoader
 from tve.pipeline import (
     DATA_PATH,
     ES_URL,
@@ -28,7 +19,6 @@ from tve.pipeline import (
     test_different_vectors,
     test_translation,
 )
-from tve.translators.promt import PROMTTranslator
 from tve.utils import (
     CircularTaskGroup,
     ForgivingTaskGroup,
@@ -39,8 +29,6 @@ from tve.utils import (
 )
 
 logger = logging.getLogger(__name__)
-
-# translator = PROMTTranslator(PROMT_IP, enable_cache=True)
 
 
 async def main(

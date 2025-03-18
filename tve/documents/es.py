@@ -7,10 +7,8 @@ import logging
 import re
 from collections import defaultdict
 from functools import cached_property
-from itertools import compress, product
-from operator import itemgetter
+from itertools import product
 
-import aiohttp
 from elasticsearch7 import (
     AsyncElasticsearch,
     Elasticsearch,

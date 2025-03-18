@@ -1,45 +1,19 @@
 import argparse
 import asyncio
-import json
 import logging
 import os
 import re
-import sys
-import time
-from itertools import product
-from pathlib import Path
 
-import aiofiles
-import numpy as np
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 from tqdm import tqdm
-from tqdm.asyncio import tqdm_asyncio
 
-from tve.base import LoaderBase
 from tve.documents.fs import FSLoader
-from tve.pipeline import (
-    DATA_PATH,
-    DOCS_PATH,
-    ES_URL,
-    FIPS_API_KEY,
-    PROMPTS_PATH,
-    extract_keywords_from_docs,
-    get_cluster_from_document,
-    get_relevant,
-    test_different_vectors,
-)
-from tve.prompts import PromptTemplate, en_expand_prompt, ru_expand_prompt
+from tve.pipeline import DATA_PATH, DOCS_PATH, PROMPTS_PATH
+from tve.prompts import PromptTemplate
 
 # from tve.translators.promt import PROMTTranslator
 from tve.translators.langchain import LangChainTranslator
-from tve.utils import (
-    CircularTaskGroup,
-    ForgivingTaskGroup,
-    batched,
-    flatten_kws,
-    load_data_from_json,
-    save_data_to_json,
-)
+from tve.utils import CircularTaskGroup, load_data_from_json, save_data_to_json
 
 logging.getLogger("openai._base_client").setLevel(logging.WARN)
 logging.getLogger("httpx").setLevel(logging.WARN)

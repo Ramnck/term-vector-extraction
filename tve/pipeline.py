@@ -27,12 +27,7 @@ from typing import Union
 from dotenv import load_dotenv
 
 from .base import DocumentBase, KeyWordExtractorBase, LoaderBase, TranslatorBase
-from .lexis import (
-    clean_ru_text,
-    extract_number,
-    lemmatize_ru_word,
-    make_extended_term_vec,
-)
+from .lexis import make_extended_term_vec
 from .utils import ForgivingTaskGroup, batched, flatten_kws
 
 BASE_PATH = Path(os.environ.get("BASE_PATH", "data"))
